@@ -1,15 +1,12 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo import MongoClient
 import os
 
-# MongoDB 연결 URL
-# 로컬: "mongodb://localhost:27017"
-# Atlas: "mongodb+srv://username:password@cluster.mongodb.net/"
-MONGODB_URL = "mongodb://localhost:27017"
+# MongoDB Atlas 연결 URL (본인 정보로 수정해야 함)
+MONGODB_URL = "mongodb+srv://tina030917_db_user:uSUEMMcX7mN966WK@cluster0.evfuuit.mongodb.net/"
 
-# 클라이언트 생성
+# 비동기 클라이언트 생성
 client = AsyncIOMotorClient(MONGODB_URL)
-database = client.elder_care_db
+database = client.AI_EMOTION
 
 # 컬렉션 참조
 users_collection = database.users
