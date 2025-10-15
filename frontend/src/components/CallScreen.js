@@ -48,7 +48,7 @@ const CallScreen = ({ setCurrentScreen, setIsCallActive }) => {
           <div className="w-64 h-64 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <Video className="w-32 h-32 text-white" />
           </div>
-          <p className="text-2xl">AI 친구와 대화중...</p>
+          <p className="text-2xl">말동이와 대화중...</p>
           
           {/* 백엔드 연동 테스트 버튼 */}
           <button
