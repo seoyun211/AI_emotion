@@ -66,3 +66,9 @@ def predict(data: InputData):
         
     except Exception as e:
         return {"error": str(e)}
+
+# 🔥 이 부분이 꼭 필요합니다! 🔥
+if __name__ == "__main__":
+    import uvicorn
+    print("🚀 말동이 백엔드 서버 시작합니다...")
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)

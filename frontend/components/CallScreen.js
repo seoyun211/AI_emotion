@@ -1,85 +1,91 @@
-import React from 'react';
-import { Video, PhoneOff, Bell, User } from 'lucide-react';
-import { Smile, Frown, Meh } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
+import { analyzeEmotion } from '../services/api';
 
-const CallScreen = ({ currentEmotion, setCurrentEmotion, setIsCallActive, setCurrentScreen, emotions }) => {
-  const getEmotionIcon = (iconName) => {
-    const iconMap = {
-      Smile: Smile,
-      Frown: Frown,
-      Meh: Meh,
-    };
-    return iconMap[iconName] || Meh;
+const CallScreen = ({ setCurrentScreen, setIsCallActive }) => {
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  const [transcript, setTranscript] = useState('');
+
+  // 음성 인식 시뮬레이션 (백엔드 연동)
+  const simulateSpeechRecognition = async () => {
+    const sampleTexts = [
+      "오늘 기분이 좋아요",
+      "조금 외로워요",
+      "아들이 보고 싶어요", 
+      "날씨가真好네요",
+      "혼자 있는게 싫어요"
+    ];
+    
+    const randomText = sampleTexts[Math.floor(Math.random() * sampleTexts.length)];
+    const newTranscript = transcript + ' ' + randomText;
+    setTranscript(newTranscript);
+
+    // 백엔드에 감정 분석 요청
+    try {
+      const result = await analyzeEmotion(newTranscript);
+      console.log('감정 분석 결과:', result);
+      
+      // 위험 감정 감지 시 알림
+      if (result.needs_alert) {
+        alert(`🚨 위험 감정 감지: ${result.emotion}`);
+      }
+    } catch (error) {
+      console.error('감정 분석 실패:', error);
+    }
   };
 
-  const EmotionIcon = getEmotionIcon(emotions[currentEmotion].icon);
+  const endCall = () => {
+    setIsCallActive(false);
+    setCurrentScreen('home');
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900">
-      {/* 비디오 영역 */}
-      <div className="flex-1 relative bg-gradient-to-br from-gray-800 to-gray-900">
-        {/* AI 화면 (메인) */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="bg-gradient-to-br from-blue-400 to-purple-500 w-64 h-64 rounded-full flex items-center justify-center">
-            <User className="w-32 h-32 text-white" />
+      {/* 원본 UI 구조 유지 */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-center text-white">
+          <div className="w-64 h-64 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Video className="w-32 h-32 text-white" />
           </div>
-        </div>
-
-        {/* 사용자 화면 (작은 창) */}
-        <div className="absolute top-8 right-8 bg-gray-700 w-48 h-36 rounded-2xl shadow-2xl border-4 border-white">
-          <div className="w-full h-full bg-gradient-to-br from-gray-600 to-gray-700 rounded-xl flex items-center justify-center">
-            <User className="w-16 h-16 text-gray-400" />
-          </div>
-        </div>
-
-        {/* 감정 상태 표시 */}
-        <div className="absolute top-8 left-8 bg-white rounded-2xl px-8 py-4 shadow-2xl">
-          <div className="flex items-center gap-4">
-            <div className={`${emotions[currentEmotion].color} w-16 h-16 rounded-full flex items-center justify-center`}>
-              <EmotionIcon className="w-8 h-8 text-white" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{emotions[currentEmotion].text}</p>
-              <p className="text-xl text-gray-600">현재 기분</p>
-            </div>
-          </div>
-        </div>
-
-        {/* 통화 시간 */}
-        <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-60 text-white px-8 py-4 rounded-full text-3xl font-bold">
-          15:23
+          <p className="text-2xl">AI 친구와 대화중...</p>
+          
+          {/* 백엔드 연동 테스트 버튼 */}
+          <button
+            onClick={simulateSpeechRecognition}
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            대화 시뮬레이션 (백엔드 테스트)
+          </button>
         </div>
       </div>
 
-      {/* 하단 컨트롤 */}
-      <div className="bg-gray-800 p-8">
-        <div className="flex justify-center gap-8 max-w-2xl mx-auto">
-          <button
-            onClick={() => setCurrentEmotion('happy')}
-            className="bg-gray-700 hover:bg-gray-600 p-6 rounded-full transition-all transform hover:scale-110"
-          >
-            <Video className="w-10 h-10 text-white" />
-          </button>
+      {/* 원본 컨트롤 바 유지 */}
+      <div className="bg-gray-800 p-6 flex justify-center gap-6">
+        <button
+          onClick={() => setIsMuted(!isMuted)}
+          className={`p-4 rounded-full ${
+            isMuted ? 'bg-red-500' : 'bg-gray-600'
+          } text-white hover:bg-opacity-80 transition-all`}
+        >
+          {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+        </button>
 
-          <button
-            onClick={() => {
-              setIsCallActive(false);
-              setCurrentScreen('home');
-            }}
-            className="bg-red-500 hover:bg-red-600 p-8 rounded-full transition-all transform hover:scale-110 shadow-2xl"
-          >
-            <PhoneOff className="w-14 h-14 text-white" />
-          </button>
+        <button
+          onClick={() => setIsVideoOff(!isVideoOff)}
+          className={`p-4 rounded-full ${
+            isVideoOff ? 'bg-red-500' : 'bg-gray-600'
+          } text-white hover:bg-opacity-80 transition-all`}
+        >
+          {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
+        </button>
 
-          <button
-            onClick={() => setCurrentEmotion(currentEmotion === 'happy' ? 'sad' : 'happy')}
-            className="bg-gray-700 hover:bg-gray-600 p-6 rounded-full transition-all transform hover:scale-110"
-          >
-            <Bell className="w-10 h-10 text-white" />
-          </button>
-        </div>
-
-        <p className="text-center text-white text-2xl mt-6">통화 중...</p>
+        <button
+          onClick={endCall}
+          className="p-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all"
+        >
+          <PhoneOff size={24} />
+        </button>
       </div>
     </div>
   );
