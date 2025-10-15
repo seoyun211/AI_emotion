@@ -42,3 +42,29 @@ export const checkServerHealth = async () => {
     return false;
   }
 };
+
+// 통화 시작 API
+export const startCall = async () => {
+  return { success: true, callId: '123' };
+};
+
+// 통화 종료 API
+export const endCall = async (callId) => {
+  return { success: true };
+};
+
+// 통화 기록 조회 API
+export const getCallHistory = async () => {
+  return [
+    { id: 1, date: '2024-01-15', emotion: 'happy', duration: '5:30' },
+    { id: 2, date: '2024-01-14', emotion: 'neutral', duration: '3:15' }
+  ];
+};
+
+// 감정 기록 조회 API
+export const getEmotionHistory = async () => {
+  return [
+    { id: 1, date: '2024-01-15', emotion: 'happy' },
+    { id: 2, date: '2024-01-14', emotion: 'neutral' }
+  ];
+};

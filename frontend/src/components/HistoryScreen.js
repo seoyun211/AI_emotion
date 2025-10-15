@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Calendar, TrendingUp } from 'lucide-react';
-import { getEmotionHistory } from '../services/api';
+import { getEmotionHistory } from '../services/api.js';
 
 const HistoryScreen = ({ setCurrentScreen }) => {
   const [emotionHistory, setEmotionHistory] = useState([]);

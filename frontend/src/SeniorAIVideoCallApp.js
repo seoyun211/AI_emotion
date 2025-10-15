@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import HomeScreen from './components/HomeScreen';
-import CallScreen from './components/CallScreen';
-import HistoryScreen from './components/HistoryScreen';
+import HomeScreen from './components/HomeScreen.js';
+import CallScreen from './components/CallScreen.js';
+import HistoryScreen from './components/HistoryScreen.js';
 
-export default function SeniorAIVideoCallApp() {
+function SeniorAIVideoCallApp() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [isCallActive, setIsCallActive] = useState(false);
   const [currentEmotion, setCurrentEmotion] = useState('neutral');
 
   const emotions = {
-    happy: { icon: 'Smile', color: 'bg-green-500', text: '기분 좋음' },
-    sad: { icon: 'Frown', color: 'bg-blue-500', text: '슬픔' },
-    neutral: { icon: 'Meh', color: 'bg-gray-400', text: '보통' },
+    happy: { icon: '😊', color: 'bg-green-500', text: '기분 좋음' },
+    sad: { icon: '😢', color: 'bg-blue-500', text: '슬픔' },
+    neutral: { icon: '😐', color: 'bg-gray-400', text: '보통' },
   };
 
   const screens = {
@@ -29,8 +29,10 @@ export default function SeniorAIVideoCallApp() {
   };
 
   return (
-    <div className="font-sans">
+    <div className="font-sans min-h-screen bg-gray-50">
       {screens[currentScreen]}
     </div>
   );
 }
+
+export default SeniorAIVideoCallApp;

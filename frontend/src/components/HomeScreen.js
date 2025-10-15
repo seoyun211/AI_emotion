@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Video, Phone, Heart } from 'lucide-react';
-import { analyzeEmotion, checkServerHealth } from '../services/api';
+import { analyzeEmotion, checkServerHealth } from '../services/api.js';
 
 const HomeScreen = ({ setCurrentScreen, setIsCallActive }) => {
   const [serverOnline, setServerOnline] = useState(false);

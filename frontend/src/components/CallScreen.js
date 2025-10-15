@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PhoneOff, Mic, MicOff, Video, VideoOff } from 'lucide-react';
-import { analyzeEmotion } from '../services/api';
+import { analyzeEmotion } from '../services/api.js';
 
 const CallScreen = ({ setCurrentScreen, setIsCallActive }) => {
   const [isMuted, setIsMuted] = useState(false);
