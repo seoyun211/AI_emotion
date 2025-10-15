@@ -42,7 +42,7 @@ const HomeScreen = ({ setCurrentScreen, setIsCallActive }) => {
           <div className="bg-blue-500 w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6">
             <Video className="w-16 h-16 text-white" />
           </div>
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">AI 친구</h1>
+          <h1 className="text-5xl font-bold text-gray-800 mb-4">말동이</h1>
           <p className="text-3xl text-gray-600">언제든 이야기하세요</p>
           
           {/* 서버 상태만 간단히 표시 */}
