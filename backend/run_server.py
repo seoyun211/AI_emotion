@@ -1,10 +1,11 @@
 import uvicorn
+from config import APP_CONFIG
 
 if __name__ == "__main__":
+    print("🚀 말동이 백엔드 서버 시작...")
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",  # 모든 IP에서 접속 가능
-        port=8080,       # 8080 포트 사용
-        reload=True,     # 코드 변경시 자동 재시작
-        access_log=True  # 접속 로그 표시
+        host=APP_CONFIG["host"],
+        port=APP_CONFIG["port"],
+        reload=True
     )
