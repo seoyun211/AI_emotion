@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
         serverOnline = isOnline;
       });
     } catch (error) {
-      print('서버 상태 확인 실패: $error');
       setState(() {
         serverOnline = false;
       });
@@ -40,29 +39,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void handleStartCall() {
-    if (serverOnline) {
-      print('영상통화 시작 - 백엔드에 알림');
-    }
     widget.onCallStatusChange(true);
     widget.onScreenChange('call');
   }
 
   void handleViewHistory() {
-    if (serverOnline) {
-      print('기록 조회 - 백엔드 데이터 로드');
-    }
     widget.onScreenChange('history');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEFF6FF),
+      backgroundColor: Color(0xFFEFF6FF),
       body: SafeArea(
         child: Center(
           child: Container(
-            margin: const EdgeInsets.all(32),
-            padding: const EdgeInsets.all(32),
+            margin: EdgeInsets.all(32),
+            padding: EdgeInsets.all(32),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(32),
@@ -70,14 +63,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
                   blurRadius: 32,
-                  offset: const Offset(0, 8),
+                  offset: Offset(0, 8),
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Column(
+                Column(
                   children: [
                     Container(
                       width: 128,
@@ -111,9 +104,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: serverOnline ? Colors.green.shade50 : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(20),
@@ -126,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: serverOnline ? Colors.green : Colors.red,
                         size: 16,
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         serverOnline ? '✅ 서버 연결됨' : '❌ 서버 연결 안됨',
                         style: TextStyle(
@@ -138,14 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32),
                 _buildActionButton(
                   title: '영상통화 시작',
                   icon: Icons.call,
                   color: Colors.green,
                   onPressed: handleStartCall,
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 _buildActionButton(
                   title: '감정 기록 보기',
                   icon: Icons.favorite,
@@ -168,40 +161,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return GestureDetector(
       onTap: onPressed,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 32),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(0.3),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              blurRadius: 16,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 32),
+            SizedBox(width: 16),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
                 color: Colors.white,
-                size: 32,
               ),
-              const SizedBox(width: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
