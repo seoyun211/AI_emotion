@@ -45,20 +45,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final koreanToKey = {
       '기쁨': 'happy',
       '슬픔': 'sad',
-      '분노': 'sad',
+      '분노': 'angry',
+      'happy': 'happy',
+      'sad': 'sad',
+      'angry': 'angry',
+      'neutral': 'neutral',
     };
     final emotionKey = koreanToKey[emotion] ?? 'neutral';
-    return EmotionConfig.getEmotionColor(emotionKey);
+    final emotionConfig = EmotionConfig.getEmotion(emotionKey);
+    return emotionConfig['color'] ?? Colors.grey;
   }
 
   Color _getEmotionTextColor(String emotion) {
-    final koreanToKey = {
-      '기쁨': 'happy',
-      '슬픔': 'sad',
-      '분노': 'sad',
+    // 텍스트 색상은 일반적으로 흰색으로 통일
+    return Colors.white;
+  }
+
+  String _getEmotionDisplayName(String emotion) {
+    final koreanNames = {
+      'happy': '기쁨',
+      'sad': '슬픔',
+      'angry': '분노',
+      'neutral': '중립',
+      '기쁨': '기쁨',
+      '슬픔': '슬픔',
+      '분노': '분노',
     };
-    final emotionKey = koreanToKey[emotion] ?? 'neutral';
-    return EmotionConfig.getEmotionColor(emotionKey);
+    return koreanNames[emotion] ?? emotion;
   }
 
   @override
@@ -138,12 +151,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         )
                       : emotionHistory.isEmpty
                           ? Center(
-                              child: Text(
-                                '기록이 없습니다',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey.shade500,
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    size: 64,
+                                    color: Colors.grey.shade300,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '아직 기록이 없습니다',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '영상통화를 시작해보세요!',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ),
+                                ],
                               ),
                             )
                           : ListView.separated(
@@ -155,50 +187,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               itemBuilder: (context, index) {
                                 final record = emotionHistory[index];
+                                final emotion = record['emotion']?.toString() ?? 'neutral';
+                                final duration = record['duration']?.toString() ?? '';
+                                final summary = record['summary']?.toString() ?? '';
+                                
                                 return Container(
                                   color: Colors.transparent,
                                   child: Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: () {},
+                                      onTap: () {
+                                        // 기록 상세보기 기능 (선택사항)
+                                        print('기록 선택: $record');
+                                      },
                                       child: Padding(
                                         padding: const EdgeInsets.all(20),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                               children: [
                                                 Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
+                                                  padding: const EdgeInsets.symmetric(
                                                     horizontal: 12,
                                                     vertical: 6,
                                                   ),
                                                   decoration: BoxDecoration(
-                                                    color:
-                                                        _getEmotionBackgroundColor(
-                                                            record['emotion']),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            20),
+                                                    color: _getEmotionBackgroundColor(emotion),
+                                                    borderRadius: BorderRadius.circular(20),
                                                   ),
                                                   child: Text(
-                                                    record['emotion'] ?? '중립',
+                                                    _getEmotionDisplayName(emotion),
                                                     style: TextStyle(
                                                       fontSize: 14,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color:
-                                                          _getEmotionTextColor(
-                                                              record[
-                                                                  'emotion']),
+                                                      fontWeight: FontWeight.w600,
+                                                      color: _getEmotionTextColor(emotion),
                                                     ),
                                                   ),
                                                 ),
-                                                const SizedBox(width: 8),
                                                 Text(
-                                                  _formatDate(record['date']),
+                                                  _formatDate(record['date']?.toString() ?? ''),
                                                   style: const TextStyle(
                                                     fontSize: 14,
                                                     color: Color(0xFF6B7280),
@@ -206,23 +235,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 8),
-                                            if (record['text_content'] != null)
+                                            const SizedBox(height: 12),
+                                            if (summary.isNotEmpty)
                                               Text(
-                                                record['text_content'],
+                                                summary,
                                                 style: const TextStyle(
                                                   fontSize: 16,
                                                   color: Color(0xFF374151),
                                                   height: 1.4,
                                                 ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             const SizedBox(height: 8),
-                                            Text(
-                                              '위험도: ${((record['risk_score'] ?? 0) * 100).round()}%',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey.shade600,
-                                              ),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time,
+                                                  size: 16,
+                                                  color: Colors.grey.shade500,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  duration.isNotEmpty ? duration : '시간 정보 없음',
+                                                  style: TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
                                         ),

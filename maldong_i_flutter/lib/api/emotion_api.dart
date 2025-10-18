@@ -143,7 +143,137 @@ class EmotionApi {
       print('감정 응답 API 호출 실패: $error');
       // 임시 응답 데이터
       final responses = {
-        'happy': {'response': '정말 기쁜 일이 있으셨군요! 더 즐거운 이야기 해보세요.'},
+     // lib/api/emotion_api.dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'config.dart';
+
+class EmotionApi {
+  // 서버 상태 확인 - 실제 백엔드 호출
+  static Future<bool> checkServerHealth() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/health'),
+        timeout: const Duration(seconds: 5),
+      );
+      return response.statusCode == 200;
+    } catch (error) {
+      print('서버 상태 확인 실패: $error');
+      return false;
+    }
+  }
+
+  // 감정 분석 - 실제 백엔드 호출
+  static Future<Map<String, dynamic>> analyzeEmotion(String text, {String? userId}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/predict'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'text': text,
+          'user_id': userId ?? 'default_user',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('감정 분석 실패: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('감정 분석 API 호출 실패: $error');
+      throw error;
+    }
+  }
+
+  // 통화 시작 - 백엔드에 통화 시작 알림
+  static Future<Map<String, dynamic>> startCall() async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/call/start'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': 'senior_user',
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('통화 시작 실패: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('통화 시작 API 호출 실패: $error');
+      // 실패해도 임시 데이터 반환
+      return {'success': true, 'callId': 'temp_${DateTime.now().millisecondsSinceEpoch}'};
+    }
+  }
+
+  // 통화 종료 - 백엔드에 통화 종료 알림
+  static Future<Map<String, dynamic>> endCall(String callId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/call/end'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'call_id': callId,
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('통화 종료 실패: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('통화 종료 API 호출 실패: $error');
+      return {'success': true};
+    }
+  }
+
+  // 감정 기록 조회 - 실제 백엔드 호출
+  static Future<List<Map<String, dynamic>>> getEmotionHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/history/emotions'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('기록 조회 실패: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('감정 기록 API 호출 실패: $error');
+      // 실패 시 빈 배열 반환
+      return [];
+    }
+  }
+
+  // 통화 기록 조회
+  static Future<List<Map<String, dynamic>>> getCallHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/history/calls'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List<Map<String, dynamic>>.from(data);
+      } else {
+        throw Exception('통화 기록 조회 실패: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('통화 기록 API 호출 실패: $error');
+      return [];
+    }
+  }
+}   'happy': {'response': '정말 기쁜 일이 있으셨군요! 더 즐거운 이야기 해보세요.'},
         'sad': {'response': '슬픈 기분이시군요. 제가 함께 있어드릴게요.'},
         'neutral': {'response': '오늘 하루는 어떠셨나요?'},
       };
