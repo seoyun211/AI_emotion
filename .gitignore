@@ -7,3 +7,14 @@ __pycache__/
 *.pyc
 .env
 node_modules/
+#표정 데이터
+processed_data/
+failed_images/
+test_images/
+cache/
+
+#모델
+models/
+*.pt
+yolov8n.pt
+.DS_Store
