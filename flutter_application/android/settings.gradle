@@ -10,6 +10,8 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        maven { url 'https://dl.google.com/dl/android/maven2' } // google() 미러
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2' } // mavenCentral 미러
         google()
         mavenCentral()
         gradlePluginPortal()
@@ -22,4 +24,13 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.8.22" apply false
 }
 
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        maven { url 'https://dl.google.com/dl/android/maven2' }
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2' }
+        google()
+        mavenCentral()
+    }
+}
 include ":app"
