@@ -33,7 +33,9 @@ JWT_CONFIG = {
 }
 
 # MongoDB 설정
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017/elder_care")
+MONGODB_URL = os.getenv("MONGODB_URL")
+if not MONGODB_URL:
+    raise RuntimeError("MONGODB_URL is not set. Put your Atlas SRV URI in .env")
 
 # 모델 서버 설정
 MODEL_SERVERS = {
