@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import uuid
 from datetime import datetime
+from routers.auth import router as auth_router
 
 app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
 
@@ -15,6 +16,7 @@ app.add_middleware(
     allow_methods=["*"],  # 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )
+app.include_router(auth_router)
 
 # 기존 API 코드...
 class InputData(BaseModel):
