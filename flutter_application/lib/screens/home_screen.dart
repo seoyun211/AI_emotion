@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenSettings;
-  final VoidCallback onStartCall; // ✅ 추가
+  final VoidCallback onStartCall;   // ✅ 콜백
 
   const HomeScreen({
     super.key,
@@ -14,7 +14,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        // 배경 그라디언트: from-amber-50 to-orange-100
+        // 배경 그라디언트
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
@@ -29,7 +29,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 상단 인사 + 설정 버튼
+                  // 상단 인사 + 설정
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -86,7 +86,7 @@ class HomeScreen extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 24),
                     child: Column(
                       children: [
-                        // 영상 화면 영역
+                        // 영상 영역
                         AspectRatio(
                           aspectRatio: 16 / 9,
                           child: Container(
@@ -112,7 +112,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // 👉 여기 버튼이 영상통화 시작
+                        // 🔶 영상통화 시작 버튼
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -143,7 +143,11 @@ class HomeScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(24),
                               ),
                             ),
-                            onPressed: onStartCall, // ✅ React의 setIsInCall + setCurrentScreen 대체
+                            onPressed: () {
+                              // 디버그용 로그
+                              debugPrint('[HOME] 영상통화 버튼 클릭');
+                              onStartCall();     // ✅ 여기서 호출!
+                            },
                             icon: const Icon(
                               Icons.phone,
                               size: 32,
