@@ -40,9 +40,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   String _formatTime(int seconds) {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
-    final m = mins.toString().padLeft(2, '0');
-    final s = secs.toString().padLeft(2, '0');
-    return '$m:$s';
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -55,7 +53,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
-                  // 배경 그라디언트 + 중앙 AI 프로필
+                  // 배경 + 가운데 AI 친구
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
@@ -116,7 +114,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 상단 왼쪽: 통화 중 표시
+                  // 상단 왼쪽: 통화 중
                   Positioned(
                     top: 16,
                     left: 16,
@@ -154,7 +152,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 상단 오른쪽: 내 화면 미리보기
+                  // 상단 오른쪽: 내 화면
                   Positioned(
                     top: 16,
                     right: 16,
@@ -192,7 +190,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 하단 컨트롤 버튼들
+                  // 하단 컨트롤
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -200,18 +198,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 채팅 버튼
                         _circleButton(
                           icon: Icons.chat_bubble_outline,
                           onTap: () {
-                            // TODO: 통화 중 채팅 열기
+                            // TODO: 통화 중 채팅
                           },
                         ),
                         const SizedBox(width: 24),
-                        // 통화 종료 버튼 (빨간색)
                         GestureDetector(
                           onTap: () {
-                            widget.onEndCall();
+                            debugPrint('[CALL] 통화 종료 버튼 클릭');
+                            widget.onEndCall();   // ✅ 메인으로 신호 보냄
                           },
                           child: Container(
                             width: 90,
@@ -237,11 +234,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           ),
                         ),
                         const SizedBox(width: 24),
-                        // 카메라 전환/ON-OFF 버튼 (더미)
                         _circleButton(
                           icon: Icons.videocam,
                           onTap: () {
-                            // TODO: 카메라 전환 / ON/OFF
+                            // TODO: 카메라 전환
                           },
                         ),
                       ],
