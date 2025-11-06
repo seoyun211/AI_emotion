@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenSettings;
+  final VoidCallback onStartCall; // ✅ 추가
 
-  const HomeScreen({super.key, required this.onOpenSettings});
+  const HomeScreen({
+    super.key,
+    required this.onOpenSettings,
+    required this.onStartCall,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        // 배경 그라디언트: from-amber-50 to-orange-100
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
@@ -21,6 +27,7 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24.0),
             child: SingleChildScrollView(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 상단 인사 + 설정 버튼
                   Row(
@@ -29,33 +36,62 @@ class HomeScreen extends StatelessWidget {
                       const Text(
                         '안녕하세요 👋',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 40,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
-                      IconButton.filled(
-                        onPressed: onOpenSettings,
-                        icon: const Icon(Icons.settings),
-                        iconSize: 32,
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          onPressed: onOpenSettings,
+                          icon: const Icon(
+                            Icons.settings,
+                            size: 30,
+                            color: Colors.black87,
+                          ),
+                        ),
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 24),
 
-                  // 영상 통화 카드
-                  Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                  // 메인 카드
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 12,
+                          offset: Offset(0, 6),
+                        ),
+                      ],
                     ),
-                    elevation: 6,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        children: [
-                          Container(
-                            height: 180,
+                    padding: const EdgeInsets.all(24),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    child: Column(
+                      children: [
+                        // 영상 화면 영역
+                        AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: Container(
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(24),
                               gradient: const LinearGradient(
                                 colors: [
                                   Color(0xFFFFCC80),
@@ -67,68 +103,92 @@ class HomeScreen extends StatelessWidget {
                             ),
                             child: const Center(
                               child: Icon(
-                                Icons.videocam,
+                                Icons.photo_camera,
                                 color: Colors.white,
-                                size: 72,
+                                size: 80,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // 👉 여기 버튼이 영상통화 시작
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFFFFB300),
+                                Color(0xFFFF6F00),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
                               ),
-                              onPressed: () {
-                                // TODO: 영상통화 시작 로직 (WebRTC 연동)
-                              },
-                              icon: const Icon(Icons.phone, size: 28),
-                              label: const Text(
-                                'AI와 영상통화 시작',
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            ],
+                          ),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                            ),
+                            onPressed: onStartCall, // ✅ React의 setIsInCall + setCurrentScreen 대체
+                            icon: const Icon(
+                              Icons.phone,
+                              size: 32,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              'AI와 영상통화 시작',
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
 
-                  // 아래 두 개 카드 (채팅하기 / 건강기록)
+                  // 아래 두 카드
                   Row(
                     children: [
                       Expanded(
-                        child: _HomeSmallCard(
+                        child: _FeatureCard(
                           icon: Icons.chat_bubble_outline,
-                          title: '채팅하기',
                           iconColor: Colors.blue,
+                          title: '채팅하기',
                           onTap: () {
-                            // TODO: 채팅 화면으로 이동
+                            // TODO: 채팅 화면 이동
                           },
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _HomeSmallCard(
-                          icon: Icons.favorite_border,
-                          title: '건강기록',
+                        child: _FeatureCard(
+                          icon: Icons.show_chart,
                           iconColor: Colors.green,
+                          title: '건강기록',
                           onTap: () {
-                            // TODO: 건강 기록 화면으로 이동
+                            // TODO: 건강 기록 화면 이동
                           },
                         ),
                       ),
                     ],
-                  )
+                  ),
                 ],
               ),
             ),
@@ -139,43 +199,55 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _HomeSmallCard extends StatelessWidget {
+class _FeatureCard extends StatelessWidget {
   final IconData icon;
-  final String title;
   final Color iconColor;
+  final String title;
   final VoidCallback onTap;
 
-  const _HomeSmallCard({
+  const _FeatureCard({
     required this.icon,
-    required this.title,
     required this.iconColor,
+    required this.title,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 4,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: iconColor),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            ],
-          ),
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 40,
+              color: iconColor,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            )
+          ],
         ),
       ),
     );
