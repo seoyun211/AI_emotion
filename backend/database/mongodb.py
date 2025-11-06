@@ -1,43 +1,58 @@
-# database/mongodb.py
-from motor.motor_asyncio import AsyncIOMotorClient
-from config import MONGODB_URL
+import os
+from pymongo import MongoClient
+from dotenv import load_dotenv
 
+# .env 파일 로드
+load_dotenv()
+
+# MongoDB 연결 정보
+MONGODB_URI = os.getenv('MONGODB_URI')
+DB_NAME = os.getenv('DB_NAME')
+
+# 전역 변수로 MongoDB 클라이언트 관리
 client = None
-database = None
-
-users_collection = None
-emotion_logs_collection = None
-guardians_collection = None
-alerts_collection = None
+db = None
 
 async def connect_to_mongo():
-    """
-    서버 시작 시 MongoDB 연결
-    """
-    global client, database, users_collection, emotion_logs_collection, guardians_collection, alerts_collection
-
+    """MongoDB에 연결"""
+    global client, db
     try:
-        client = AsyncIOMotorClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
-        # URI에 /ai_emotion 같은 DB 이름이 있다면 그걸 가져오고,
-        # 없다면 기본값 'ai_emotion'으로 접속
-        database = client.get_default_database() or client["ai_emotion"]
-        await database.command("ping")
-
-        users_collection = database["users"]
-        emotion_logs_collection = database["emotion_logs"]
-        guardians_collection = database["guardians"]
-        alerts_collection = database["alerts"]
-
-        print(f"✅ MongoDB Atlas 연결 성공 (DB: {database.name})")
-
+        client = MongoClient(MONGODB_URI)
+        # 연결 테스트
+        client.admin.command('ping')
+        db = client[DB_NAME]
+        print("✅ MongoDB 연결 성공!")
+        return True
     except Exception as e:
-        print(f"❌ MongoDB Atlas 연결 실패: {e}")
+        print(f"❌ MongoDB 연결 실패: {e}")
+        return False
 
 async def close_mongo_connection():
-    """
-    서버 종료 시 MongoDB 연결 닫기
-    """
+    """MongoDB 연결 종료"""
     global client
     if client:
         client.close()
-        print("🛑 MongoDB 연결 종료")
+        print("✅ MongoDB 연결 종료")
+
+async def test_connection():
+    """MongoDB 연결 상태 테스트"""
+    global client
+    try:
+        if client:
+            client.admin.command('ping')
+            return True
+        return False
+    except Exception:
+        return False
+
+def get_database():
+    """데이터베이스 인스턴스 반환"""
+    global db
+    return db
+
+def get_collection(collection_name):
+    """컬렉션 인스턴스 반환"""
+    global db
+    if db is None:
+        raise Exception("Database not connected")
+    return db[collection_name]
