@@ -4,8 +4,14 @@ import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();               
+  await initializeDateFormatting('ko_KR', null);           // ✅ 한국 로케일 날짜 데이터 로드
+  Intl.defaultLocale = 'ko_KR';                            // ✅ 기본 로케일을 한국어로
   runApp(const MalDongApp());
 }
 
