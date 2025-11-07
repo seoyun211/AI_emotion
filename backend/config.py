@@ -32,9 +32,6 @@ JWT_CONFIG = {
     "access_token_expire_minutes": 60 * 24  # 24시간
 }
 
-# MongoDB 설정
-MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017/elder_care")
-
 # 모델 서버 설정
 MODEL_SERVERS = {
     "text_model": {
@@ -65,4 +62,15 @@ MODEL_WEIGHTS = {
 EMOTION_CONFIG = {
     "risk_threshold": 0.7,
     "high_risk_emotions": ["슬픔", "분노", "불안"]
+}
+
+# 데이터베이스 설정(MySQL)
+DATABASE_CONFIG = {
+    "host": os.getenv("DB_HOST", "127.0.0.1"),
+    "port": int(os.getenv("DB_PORT", 3306)),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "your_mysql_root_password"), # 기본값은 보안에 취약하므로 실제 비밀번호를 .env에 설정하세요.
+    "database": os.getenv("DB_NAME", "emotion_analysis_app"),
+    "dialect": "mysql",
+    "driver": "pymysql" # Python MySQL 드라이버 (프로젝트에서 어떤 라이브러리를 쓰는지에 따라 변경될 수 있음)
 }
