@@ -1,69 +1,63 @@
-from pydantic import BaseModel, EmailStr
+# models/schemas.py
+from pydantic import BaseModel
+from datetime import datetime, date
 from typing import Optional, List
-from datetime import datetime
 
-# 요청 스키마
-class InputData(BaseModel):
-    text: str
-    user_id: Optional[str] = None
-
+# 1) 사용자(회원)
 class UserCreate(BaseModel):
-    name: str
-    phone: str
-    age: int
-    emergency_contact: str
-
-class GuardianCreate(BaseModel):
-    name: str
-    phone: str
-    password: str
-    email: Optional[EmailStr] = None
-
-class GuardianLogin(BaseModel):
-    phone: str
-    password: str
-
-# 응답 스키마
-class EmotionResponse(BaseModel):
-    emotion: str
-    confidence: float
-    risk_score: float
-    needs_alert: bool
-    analysis_id: str
-    user_id: Optional[str] = None
-    timestamp: datetime
+  name: str              # 회원명
+  gender: str            # "M" / "F" 또는 "남" / "여"
+  birth_date: date       # 생년월일
+  address: str           # 주소
+  guardian_name: str     # 보호자명
+  guardian_phone: str    # 보호자 연락처
 
 class UserResponse(BaseModel):
-    user_id: str
-    name: str
-    message: str
-    timestamp: datetime
+  user_id: str
+  name: str
+  gender: str
+  birth_date: date
+  address: str
+  guardian_name: str
+  guardian_phone: str
+  created_at: datetime
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+# 2) 통화 기록
+class CallStartRequest(BaseModel):
+  user_id: str  # 어떤 회원이 통화 시작했는지
 
-class TokenData(BaseModel):
-    phone: Optional[str] = None
-    guardian_id: Optional[str] = None
+class CallEndRequest(BaseModel):
+  # 필요하다면 여기에 추가 정보 (예: 통화 중 이벤트) 넣을 수 있음
+  pass
 
-class GuardianResponse(BaseModel):
-    id: str
-    name: str
-    phone: str
-    email: Optional[str] = None
+class CallResponse(BaseModel):
+  call_id: str
+  user_id: str
+  start_time: datetime
+  end_time: Optional[datetime] = None
+  duration_seconds: Optional[int] = None
 
-class AlertResponse(BaseModel):
-    id: str
-    guardian_id: str
-    elder_name: str
-    message: str
-    alert_level: str
-    is_read: bool
-    created_at: str
+# 3) 분석 기록 + 감정 분석 요청
+class PredictRequest(BaseModel):
+  text: str
+  user_id: Optional[str] = None
+  call_id: Optional[str] = None  # 어떤 통화에 대한 분석인지
 
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: datetime
-    mongodb: str
-    version: str
+class PredictResponse(BaseModel):
+  analysis_id: str
+  emotion: str
+  confidence: float
+  risk_score: float
+  needs_alert: bool
+  user_id: Optional[str]
+  call_id: Optional[str]
+  message: str
+
+class AnalysisRecord(BaseModel):
+  analysis_id: str
+  call_id: str
+  analyzed_at: datetime
+  text_result: str
+  voice_result: Optional[str] = None
+  facial_result: Optional[str] = None
+  final_result: str
