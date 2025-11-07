@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'font_size_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback onBack;
@@ -79,7 +80,15 @@ class SettingsScreen extends StatelessWidget {
                           _SettingsItem(
                             icon: Icons.text_increase,
                             title: '글씨 크기',
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context, 
+                                MaterialPageRoute(
+                                  builder: (context) => const FontSizeScreen(),
+                                )
+
+                              );
+                            },
                           ),
                           const Divider(height: 0),
                           _SettingsItem(

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
+import 'font_size_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -12,7 +14,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();               
   await initializeDateFormatting('ko_KR', null);           // ✅ 한국 로케일 날짜 데이터 로드
   Intl.defaultLocale = 'ko_KR';                            // ✅ 기본 로케일을 한국어로
-  runApp(const MalDongApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => FontSizeProvider(),
+      child: const MalDongApp(),
+    ),
+  );
 }
 
 class MalDongApp extends StatelessWidget {
@@ -20,14 +27,32 @@ class MalDongApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '말동',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      home: const _AppRoot(),
+    return Consumer<FontSizeProvider>(
+      builder: (context, fontProvider, child) {
+        return MaterialApp(
+          title: '말동',
+          debugShowCheckedModeBanner: false,
+          theme: buildAppTheme(),
+
+          // ✅ 여기서 전체 텍스트 배율을 한 번에 조정
+          builder: (context, child) {
+            final mq = MediaQuery.of(context);
+            return MediaQuery(
+              data: mq.copyWith(
+                textScaleFactor: fontProvider.fontScale, // 🔥 글자 전체 배율 적용
+              ),
+              child: child!,
+            );
+          },
+
+          home: const _AppRoot(),
+        );
+      },
     );
   }
 }
+
+
 
 enum AppScreen { auth, home, videocall, settings }
 
