@@ -12,8 +12,7 @@ router = APIRouter(prefix="/api/v1/calls", tags=["통화 기록"])
 @router.post("/start", response_model=CallResponse)
 def start_call(req: CallStartRequest, db: Session = Depends(get_db)):
     """
-    통화 시작 기록
-    - Flutter에서 영상통화 시작 버튼 눌렀을 때 호출하면 됨
+    영상통화 시작 시 호출
     """
     user = db.query(User).get(req.user_id)
     if not user:
@@ -31,8 +30,7 @@ def start_call(req: CallStartRequest, db: Session = Depends(get_db)):
 @router.post("/{call_id}/end", response_model=CallResponse)
 def end_call(call_id: int, db: Session = Depends(get_db)):
     """
-    통화 종료 기록
-    - Flutter에서 영상통화 종료 버튼 눌렀을 때 호출
+    영상통화 종료 시 호출
     """
     call = db.query(CallLog).get(call_id)
     if not call:
