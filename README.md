@@ -24,14 +24,20 @@ AI_emotion은 텍스트, 음성, 이미지 데이터를 분석하여 사용자�
 
 ## 🧠 시스템 구조
 
+✅ GitHub에서는 영어만 넣으면 100% 정상 렌더링돼.
+
+---
+
+
+```markdown
 ```mermaid
 graph TD
-    A[Flutter App (말동이)] --> B[FastAPI Server]
-    B --> C[Text Emotion Model (KoBERT)]
-    B --> D[Voice Emotion Model (CNN + MelSpectrogram)]
-    B --> E[Image Emotion Model (EfficientNetB0)]
-    C --> F[Fusion Model]
+    A["Flutter App (말동이)"] --> B["FastAPI Server"]
+    B --> C["Text Emotion Model (KoBERT)"]
+    B --> D["Voice Emotion Model (CNN + MelSpectrogram)"]
+    B --> E["Image Emotion Model (EfficientNetB0)"]
+    C --> F["Fusion Model"]
     D --> F
     E --> F
     F --> A
-    B --> G[(MongoDB Atlas)]
+    B --> G["MongoDB Atlas"]
