@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'call_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenSettings;
-  final VoidCallback onStartCall; // ✅ 추가
+  final VoidCallback onStartCall;
 
   const HomeScreen({
     super.key,
@@ -14,7 +15,6 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        // 배경 그라디언트: from-amber-50 to-orange-100
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
@@ -29,12 +29,11 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 상단 인사 + 설정 버튼
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        '안녕하세요 👋',
+                        '말동이와 함께 대화해요',
                         style: TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.bold,
@@ -69,7 +68,6 @@ class HomeScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // 메인 카드
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -86,7 +84,6 @@ class HomeScreen extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 24),
                     child: Column(
                       children: [
-                        // 영상 화면 영역
                         AspectRatio(
                           aspectRatio: 16 / 9,
                           child: Container(
@@ -112,7 +109,6 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
-                        // 👉 여기 버튼이 영상통화 시작
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -143,14 +139,14 @@ class HomeScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(24),
                               ),
                             ),
-                            onPressed: onStartCall, // ✅ React의 setIsInCall + setCurrentScreen 대체
+                            onPressed: onStartCall,
                             icon: const Icon(
                               Icons.phone,
                               size: 32,
                               color: Colors.white,
                             ),
                             label: const Text(
-                              'AI와 영상통화 시작',
+                              '말동이와 영상통화 시작',
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
@@ -163,16 +159,20 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // 아래 두 카드
                   Row(
                     children: [
                       Expanded(
                         child: _FeatureCard(
-                          icon: Icons.chat_bubble_outline,
-                          iconColor: Colors.blue,
-                          title: '채팅하기',
+                          icon: Icons.history,
+                          iconColor: Colors.deepPurple,
+                          title: '통화기록',
                           onTap: () {
-                            // TODO: 채팅 화면 이동
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(
+                                builder: (context) => const CallHistoryScreen(),
+                              ),
+                            );
                           },
                         ),
                       ),
