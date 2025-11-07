@@ -1,11 +1,15 @@
 # main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+<<<<<<< HEAD
 from pydantic import BaseModel
 from typing import Optional
+=======
+>>>>>>> cba8aa7fb5c69d0cf5121029e34b01655c3c4040
 from datetime import datetime
 import uuid
 
+<<<<<<< HEAD
 # ✅ DB 연결 함수 (다른 사람이 만든 MySQL 세션 함수)
 from database.session import get_db_connection
 
@@ -17,12 +21,21 @@ app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
 # ✅ CORS 설정 (개발 단계라 일단 전부 허용)
 app.add_middleware(
     CORSMiddleware,
+=======
+app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
+
+# ✅ CORS 설정 (Flutter, 웹 다 허용하고 싶으면 "*"로 해도 됨)
+app.add_middleware(
+    CORSMiddleware,
+    # 개발 단계에서는 일단 다 허용해도 괜찮음
+>>>>>>> cba8aa7fb5c69d0cf5121029e34b01655c3c4040
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+<<<<<<< HEAD
 # ✅ 라우터 연결
 app.include_router(users.router)      # /api/v1/users/...
 app.include_router(calls.router)      # /api/v1/calls/...
@@ -36,6 +49,9 @@ class InputData(BaseModel):
 
 # ---------- 엔드포인트들 ----------
 
+=======
+# ✅ 루트 경로
+>>>>>>> cba8aa7fb5c69d0cf5121029e34b01655c3c4040
 @app.get("/")
 def read_root():
     return {"message": "말동이 백엔드 서버 정상 작동!", "port": 8080}
@@ -63,6 +79,7 @@ def health_check():
     }
 
 
+<<<<<<< HEAD
 @app.post("/predict")
 def predict(data: InputData):
     """
@@ -132,6 +149,19 @@ def predict(data: InputData):
     }
 
 
+=======
+
+# 🔮 (선택) 나중에 감정 분석용 엔드포인트 자리는 이렇게만 잡아두고,
+# 실제 모델 호출 로직은 나중에 팀원이 MySQL/모델 붙이면서 채워도 됨.
+# from models.schemas import PredictRequest
+# @app.post("/predict")
+# def predict(req: PredictRequest):
+#     # TODO: 여기서 코랩/모델 서버 호출해서 결과 받아오기
+#     return {"message": "나중에 모델 연동 예정", "text": req.text}
+
+
+# ✅ 서버 실행
+>>>>>>> cba8aa7fb5c69d0cf5121029e34b01655c3c4040
 if __name__ == "__main__":
     import uvicorn
     print("🚀 말동이 백엔드 서버 시작합니다...")
