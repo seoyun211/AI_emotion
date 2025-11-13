@@ -1,69 +1,27 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List
-from datetime import datetime
+from pydantic import BaseModel
+from datetime import date, datetime
+from typing import Optional
 
-# 요청 스키마
-class InputData(BaseModel):
-    text: str
-    user_id: Optional[str] = None
+# -------------------------
+# 1. 요청 스키마 (User 테이블 CREATE에 사용)
+# -------------------------
 
 class UserCreate(BaseModel):
-    name: str
-    phone: str
-    age: int
-    emergency_contact: str
+    """MySQL User 테이블의 칼럼에 맞춘 Pydantic 모델"""
+    username: str
+    gender: str
+    birth_date: date  # 'YYYY-MM-DD' 형식의 날짜 객체
+    address: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_phone: Optional[str] = None 
 
-class GuardianCreate(BaseModel):
-    name: str
-    phone: str
-    password: str
-    email: Optional[EmailStr] = None
-
-class GuardianLogin(BaseModel):
-    phone: str
-    password: str
-
-# 응답 스키마
-class EmotionResponse(BaseModel):
-    emotion: str
-    confidence: float
-    risk_score: float
-    needs_alert: bool
-    analysis_id: str
-    user_id: Optional[str] = None
-    timestamp: datetime
+# -------------------------
+# 2. 응답 스키마 (User 등록 성공 응답)
+# -------------------------
 
 class UserResponse(BaseModel):
-    user_id: str
-    name: str
+    """회원가입 성공 시 반환할 응답 형식"""
+    user_id: int  # MySQL의 AUTO_INCREMENT ID
+    username: str
     message: str
     timestamp: datetime
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    phone: Optional[str] = None
-    guardian_id: Optional[str] = None
-
-class GuardianResponse(BaseModel):
-    id: str
-    name: str
-    phone: str
-    email: Optional[str] = None
-
-class AlertResponse(BaseModel):
-    id: str
-    guardian_id: str
-    elder_name: str
-    message: str
-    alert_level: str
-    is_read: bool
-    created_at: str
-
-class HealthResponse(BaseModel):
-    status: str
-    timestamp: datetime
-    mongodb: str
-    version: str
