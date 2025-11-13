@@ -5,11 +5,8 @@ from pydantic import BaseModel
 from typing import Optional
 import uuid
 from datetime import datetime
-<<<<<<< HEAD
 from routers.auth import router as auth_router
-=======
 from database.session import get_db_connection
->>>>>>> develop
 
 # -------------------------
 ## 🚀 FastAPI 앱 및 미들웨어 설정

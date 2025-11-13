@@ -1,5 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../maldong_avatar.dart';
+
+// ✅ 네 Ready Player Me 아바타 GLB URL (여자)
+const String kFemaleAvatarUrl =
+    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
+
+// 필요하면 남자도 나중에 쓰려고 미리 빼둬도 됨
+const String kMaleAvatarUrl =
+    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
 
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
@@ -55,68 +64,56 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
-                  // 배경 그라디언트 + 중앙 AI 프로필
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF4A148C), Color(0xFF0D47A1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                  // 1) 🔹 전체 화면에 말동이 아바타 깔기
+                  Positioned.fill(
+                    child: MaldongAvatar(
+                      avatarUrl: kFemaleAvatarUrl,
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 190,
-                            height: 190,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [Color(0xFFEC407A), Color(0xFFAB47BC)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black45,
-                                  blurRadius: 16,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.person,
-                                size: 90,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'AI 친구',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _formatTime(_seconds),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 24,
-                            ),
-                          ),
-                        ],
+                  ),
+
+                  // 2) 🔹 위에 살짝 그라디언트 덮어서 색감만
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.black.withOpacity(0.3),
+                            Colors.black.withOpacity(0.6),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
                       ),
                     ),
                   ),
 
-                  // 상단 왼쪽: 통화 중 표시
+                  // 3) 중앙 아래쪽에 이름 + 통화 시간
+                  Align(
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'AI 친구',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _formatTime(_seconds),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 4) 상단 왼쪽: 통화 중 표시
                   Positioned(
                     top: 16,
                     left: 16,
@@ -154,7 +151,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 상단 오른쪽: 내 화면 미리보기
+                  // 5) 상단 오른쪽: 내 캠 미리보기 박스 (그대로 유지)
                   Positioned(
                     top: 16,
                     right: 16,
@@ -192,7 +189,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 하단 컨트롤 버튼들
+                  // 6) 하단 컨트롤 버튼들 (예전 그대로)
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -200,15 +197,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // 채팅 버튼
                         _circleButton(
                           icon: Icons.chat_bubble_outline,
                           onTap: () {
-                            // TODO: 통화 중 채팅 열기
+                            // TODO: 통화 중 채팅
                           },
                         ),
                         const SizedBox(width: 24),
-                        // 통화 종료 버튼 (빨간색)
                         GestureDetector(
                           onTap: () {
                             widget.onEndCall();
@@ -237,11 +232,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                           ),
                         ),
                         const SizedBox(width: 24),
-                        // 카메라 전환/ON-OFF 버튼 (더미)
                         _circleButton(
                           icon: Icons.videocam,
                           onTap: () {
-                            // TODO: 카메라 전환 / ON/OFF
+                            // TODO: 카메라 ON/OFF
                           },
                         ),
                       ],
