@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../maldong_avatar.dart';
 
@@ -26,9 +27,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
+  final List<String> _backgrounds = [
+    'assets/background/cafe.png',
+    'assets/background/office.png',
+    'assets/background/bed.png',
+  ];
+
+  late String _selectedBackground;
+
   @override
   void initState() {
     super.initState();
+    // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
+    final random = Random();
+    _selectedBackground = _backgrounds[random.nextInt(_backgrounds.length)];
+
     _startTimer();
   }
 
@@ -64,56 +77,24 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
-                  // 1) 🔹 전체 화면에 말동이 아바타 깔기
+                  // 0) 🔹 랜덤 배경 이미지
                   Positioned.fill(
-                    child: MaldongAvatar(
-                      avatarUrl: kFemaleAvatarUrl,
+                    child: Image.asset(
+                      _selectedBackground,
+                      fit: BoxFit.cover,
                     ),
                   ),
-
-                  // 2) 🔹 위에 살짝 그라디언트 덮어서 색감만
+                  // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
                   Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.black.withOpacity(0.3),
-                            Colors.black.withOpacity(0.6),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
+                    child: Transform.scale(
+                      scale: 1.15, // 👉 아바타 조금 키운 부분
+                      child: const MaldongAvatar(
+                        avatarUrl: kFemaleAvatarUrl,
                       ),
                     ),
                   ),
 
-                  // 3) 중앙 아래쪽에 이름 + 통화 시간
-                  Align(
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'AI 친구',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _formatTime(_seconds),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 24,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 4) 상단 왼쪽: 통화 중 표시
+                  // 2) 상단 왼쪽: 통화 중 + 시간 표시
                   Positioned(
                     top: 16,
                     left: 16,
@@ -138,26 +119,39 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '통화 중',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '통화 중',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _formatTime(_seconds), // mm:ss
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ),
 
-                  // 5) 상단 오른쪽: 내 캠 미리보기 박스 (그대로 유지)
+                  // 3) 상단 오른쪽: 내 캠 미리보기 박스
                   Positioned(
                     top: 16,
                     right: 16,
                     child: Container(
-                      width: 120,
-                      height: 160,
+                      width: 200,
+                      height: 280,
                       decoration: BoxDecoration(
                         color: Colors.grey[900],
                         borderRadius: BorderRadius.circular(20),
@@ -189,7 +183,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 6) 하단 컨트롤 버튼들 (예전 그대로)
+                  // 4) 하단 컨트롤 버튼들
                   Positioned(
                     bottom: 32,
                     left: 0,

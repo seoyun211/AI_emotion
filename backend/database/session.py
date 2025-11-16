@@ -1,6 +1,5 @@
 # backend/database/session.py 내용
-
-from backend.config import DATABASE_CONFIG
+from config import DATABASE_CONFIG
 import pymysql.cursors
 
 
