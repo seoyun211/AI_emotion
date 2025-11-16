@@ -31,6 +31,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     'assets/background/cafe.png',
     'assets/background/office.png',
     'assets/background/bed.png',
+    'assets/background/home.png',
+    'assets/background/beach.png',
+    'assets/background/park.png',
   ];
 
   late String _selectedBackground;
