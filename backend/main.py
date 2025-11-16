@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import Optional
 import uuid
 from datetime import datetime
-from routers.auth import router as auth_router
+#from routers.auth import router as auth_router
 from database.session import get_db_connection
 
 # -------------------------
@@ -23,7 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(auth_router)
+#app.include_router(auth_router)
 
 # ✅ 모델 정의
 # Pydantic 모델 (입력 데이터 정의)
