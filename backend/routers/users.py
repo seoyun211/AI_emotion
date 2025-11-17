@@ -1,7 +1,7 @@
 # 👤 사용자 관리 API
 from fastapi import APIRouter, HTTPException
-from backend.models.schemas import UserCreate, UserResponse
-from backend.database.crud import UserCRUD
+from models.schemas import UserCreate, UserResponse
+from database.crud import UserCRUD
 from datetime import datetime
 import uuid
 

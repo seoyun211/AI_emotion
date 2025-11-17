@@ -1,7 +1,6 @@
-# from backend.database.session import get_db_connection
-from database.session import get_db_connection
 from typing import Dict
 from datetime import datetime
+from database.session import get_db_connection
 
 class UserCRUD:
     @staticmethod
@@ -10,7 +9,7 @@ class UserCRUD:
         if not connection:
             raise Exception("DB 연결 실패")
         
-       
+        
         sql = """
             INSERT INTO User (username, gender, birth_date, address, guardian_name, guardian_phone)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -91,7 +90,7 @@ class GuardianCRUD:
         # 보호자 전화번호로 정보를 조회하는 로직 (나중에 구현)
         # 현재는 임포트 오류 해결을 위해 정의만 해둡니다.
         return None
-    
+        
     # 필요한 다른 Guardian 관련 메서드 (예: create, update)도 여기에 추가됩니다.
     pass
 
@@ -106,6 +105,6 @@ class AlertCRUD:
     def get_pending_alerts():
         # 미처리된 알림 목록을 조회하는 로직 (나중에 구현)
         return []
-    
+        
     # 필요한 다른 Alert 관련 메서드 (예: update_status)도 여기에 추가됩니다.
     pass
