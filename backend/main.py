@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+<<<<<<< HEAD
+=======
+#from routers.auth import router as auth_router
+from database.session import get_db_connection
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
 
 from routers import users, calls, analyses
 
@@ -14,6 +19,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+#app.include_router(auth_router)
 
 # ✅ 라우터 연결
 app.include_router(users.router)      # /api/v1/users/...

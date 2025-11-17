@@ -8,12 +8,18 @@ import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter/material.dart';
+import '../maldong_avatar.dart';
 
+const femaleAvatarUrl =
+    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
+const maleAvatarUrl =
+    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();               
-  await initializeDateFormatting('ko_KR', null);           // ✅ 한국 로케일 날짜 데이터 로드
-  Intl.defaultLocale = 'ko_KR';                            // ✅ 기본 로케일을 한국어로
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ko_KR', null); // ✅ 한국 로케일 날짜 데이터 로드
+  Intl.defaultLocale = 'ko_KR'; // ✅ 기본 로케일을 한국어로
   runApp(
     ChangeNotifierProvider(
       create: (context) => FontSizeProvider(),
@@ -51,8 +57,6 @@ class MalDongApp extends StatelessWidget {
     );
   }
 }
-
-
 
 enum AppScreen { auth, home, videocall, settings }
 
@@ -117,12 +121,12 @@ class _AppRootState extends State<_AppRoot> {
       case AppScreen.home:
         return HomeScreen(
           onOpenSettings: _goToSettings,
-          onStartCall: _startCall,    // ✅ 여기서 영상통화 시작 콜백 전달
+          onStartCall: _startCall, // ✅ 여기서 영상통화 시작 콜백 전달
         );
 
       case AppScreen.videocall:
         return VideoCallScreen(
-          onEndCall: _endCall,        // ✅ 통화 종료 콜백
+          onEndCall: _endCall, // ✅ 통화 종료 콜백
         );
 
       case AppScreen.settings:
