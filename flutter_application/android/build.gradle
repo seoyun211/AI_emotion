@@ -1,16 +1,24 @@
 allprojects {
     repositories {
-        maven { url 'https://dl.google.com/dl/android/maven2' }
-        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2' }
+        // 기본 저장소
         google()
         mavenCentral()
+
+        // Flutter 엔진 / embedding 아티팩트 저장소
+        maven { url "https://storage.googleapis.com/download.flutter.io" }
+
+        // (선택) 네가 써오던 미러들 - 꼭 필요하진 않지만 놔둬도 됨
+        maven { url 'https://dl.google.com/dl/android/maven2' }
+        maven { url 'https://maven-central-asia.storage-download.googleapis.com/maven2' }
     }
 }
 
 rootProject.buildDir = "../build"
+
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }
