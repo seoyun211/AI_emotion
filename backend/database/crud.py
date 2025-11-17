@@ -1,8 +1,7 @@
-from backend.database.session import get_db_connection
+
 from typing import Dict
 from datetime import datetime
-from backend.database.session import get_db_connection
-
+from database.session import get_db_connection
 class UserCRUD:
     @staticmethod
     def create_user(user_data: Dict): # Dict는 UserCreate 스키마의 내용 (username, gender 등)

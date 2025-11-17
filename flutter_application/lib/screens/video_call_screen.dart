@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../maldong_avatar.dart';
 
-// ✅ 네 Ready Player Me 아바타 GLB URL (여자)
+// ✅ Ready Player Me 아바타 GLB URL (여자)
 const String kFemaleAvatarUrl =
     'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
 
@@ -78,24 +78,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
-<<<<<<< HEAD
-                  // 배경 + 가운데 AI 친구
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF4A148C), Color(0xFF0D47A1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-=======
                   // 0) 🔹 랜덤 배경 이미지
                   Positioned.fill(
                     child: Image.asset(
                       _selectedBackground,
                       fit: BoxFit.cover,
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                     ),
                   ),
+
                   // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
                   Positioned.fill(
                     child: Transform.scale(
@@ -106,11 +96,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-<<<<<<< HEAD
-                  // 상단 왼쪽: 통화 중
-=======
                   // 2) 상단 왼쪽: 통화 중 + 시간 표시
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     left: 16,
@@ -161,11 +147,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-<<<<<<< HEAD
-                  // 상단 오른쪽: 내 화면
-=======
                   // 3) 상단 오른쪽: 내 캠 미리보기 박스
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     right: 16,
@@ -203,11 +185,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-<<<<<<< HEAD
-                  // 하단 컨트롤
-=======
                   // 4) 하단 컨트롤 버튼들
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -225,7 +203,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
-                            widget.onEndCall();   // ✅ 메인으로 신호 보냄
+                            widget.onEndCall(); // ✅ 메인으로 신호 보냄
                           },
                           child: Container(
                             width: 90,
@@ -254,11 +232,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _circleButton(
                           icon: Icons.videocam,
                           onTap: () {
-<<<<<<< HEAD
-                            // TODO: 카메라 전환
-=======
                             // TODO: 카메라 ON/OFF
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                           },
                         ),
                       ],
