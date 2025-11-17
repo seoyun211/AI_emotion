@@ -1,7 +1,9 @@
+// main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
-import 'screens/auth_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
@@ -39,9 +41,7 @@ class MalDongApp extends StatelessWidget {
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             return MediaQuery(
-              data: mq.copyWith(
-                textScaleFactor: fontProvider.fontScale,
-              ),
+              data: mq.copyWith(textScaleFactor: fontProvider.fontScale),
               child: child!,
             );
           },
@@ -52,7 +52,7 @@ class MalDongApp extends StatelessWidget {
   }
 }
 
-enum AppScreen { auth, home, videocall, settings }
+enum AppScreen { welcome, signup, home, videocall, settings }
 
 class _AppRoot extends StatefulWidget {
   const _AppRoot();
@@ -62,11 +62,17 @@ class _AppRoot extends StatefulWidget {
 }
 
 class _AppRootState extends State<_AppRoot> {
-  AppScreen _currentScreen = AppScreen.auth;
+  AppScreen _currentScreen = AppScreen.welcome;
   bool _isLoggedIn = false;
   bool _isInCall = false;
 
-  void _handleLoginSuccess() {
+  void _goToSignUp() {
+    setState(() {
+      _currentScreen = AppScreen.signup;
+    });
+  }
+
+  void _handleSignUpSuccess() {
     setState(() {
       _isLoggedIn = true;
       _currentScreen = AppScreen.home;
@@ -102,16 +108,17 @@ class _AppRootState extends State<_AppRoot> {
   void _logout() {
     setState(() {
       _isLoggedIn = false;
-      _currentScreen = AppScreen.auth;
+      _currentScreen = AppScreen.welcome;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     switch (_currentScreen) {
-      case AppScreen.auth:
-        return AuthScreen(onLoginSuccess: _handleLoginSuccess);
-
+      case AppScreen.welcome:
+        return WelcomeScreen(onGoToSignUp: _goToSignUp);
+      case AppScreen.signup:
+        return SignUpScreen(onSignUpSuccess: _handleSignUpSuccess);
       case AppScreen.home:
         return HomeScreen(
           onOpenSettings: _goToSettings,
@@ -126,10 +133,7 @@ class _AppRootState extends State<_AppRoot> {
         );
 
       case AppScreen.settings:
-        return SettingsScreen(
-          onBack: _goToHome,
-          onLogout: _logout,
-        );
+        return SettingsScreen(onBack: _goToHome, onLogout: _logout);
     }
   }
 }
