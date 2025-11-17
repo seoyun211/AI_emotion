@@ -17,29 +17,28 @@ dependencies:
   provider: ^6.1.2
   shared_preferences: ^2.2.2
 
-  # ✅ HTTP 통신용 Dio 패키지
+  # HTTP 통신용 Dio 패키지
   dio: ^5.7.0
 
-  # ✅ 아바타 3D 표시용 패키지
+  # 아바타 3D 표시용 패키지
   model_viewer_plus: ^1.9.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
-
-  # ✅ 앱 아이콘 생성용 패키지
   flutter_launcher_icons: ^0.13.1
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/icon.png"
 
 flutter:
   uses-material-design: true
 
   assets:
     - assets/background/
-    - assets/icon/
-
-# ✅ flutter_launcher_icons 설정
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "assets/icon/app_icon.png"
+    - assets/background/icon/
+    - assets/avatar/
+    - assets/model.glb
