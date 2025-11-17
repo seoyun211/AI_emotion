@@ -1,53 +1,47 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 import 'login_screen.dart';
+import 'signup_screen.dart'; // ← (필수) 회원가입 화면 import 추가
 
-class SignUpScreen extends StatefulWidget {
-  final VoidCallback? onSignUpSuccess; 
-  const SignUpScreen({super.key, this.onSignUpSuccess});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key, required this.onLoginSuccess});
+  final VoidCallback onLoginSuccess;
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _guardianPhoneController = TextEditingController();
 
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
-    _guardianPhoneController.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (_phoneController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty ||
-        _nameController.text.trim().isEmpty) {
+        _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모든 항목을 입력해주세요')),
+        const SnackBar(content: Text('전화번호와 비밀번호를 입력해주세요')),
       );
       return;
     }
-    
-    // TODO: 실제 회원가입 로직
+
+    // TODO: 실제 로그인 로직
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('회원가입 완료!')),
+      const SnackBar(content: Text('로그인 성공!')),
     );
 
-    // 회원가입 성공 callback 실행 (null-safe)
-    widget.onSignUpSuccess?.call();
-
-    // 회원가입 후 로그인 화면으로 이동
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => LoginScreen(
-          onLoginSuccess: () {}, // 빈 callback 필요 시 이렇게 처리 가능
+        builder: (context) => HomeScreen(
+          onOpenSettings: () {},
+          onStartCall: () {},
         ),
       ),
     );
@@ -72,7 +66,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '회원가입',
+                '로그인',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -81,21 +75,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '말동이와 함께 시작해요',
+                '다시 만나서 반가워요',
                 style: TextStyle(
                   fontSize: 16,
                   color: Color(0xFF8D6E63),
                 ),
               ),
-              const SizedBox(height: 40),
-              
-              _buildTextField(
-                label: '이름',
-                controller: _nameController,
-                hintText: '홍길동',
-              ),
-              const SizedBox(height: 20),
-              
+              const SizedBox(height: 60),
+
               _buildTextField(
                 label: '전화번호',
                 controller: _phoneController,
@@ -103,24 +90,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 hintText: '010-0000-0000',
               ),
               const SizedBox(height: 20),
-              
+
               _buildTextField(
                 label: '비밀번호',
                 controller: _passwordController,
                 obscure: true,
                 hintText: '••••••••',
               ),
-              const SizedBox(height: 20),
-              
-              _buildTextField(
-                label: '보호자 전화번호',
-                controller: _guardianPhoneController,
-                keyboardType: TextInputType.phone,
-                hintText: '010-1234-5678',
-              ),
-              
+
               const SizedBox(height: 40),
-              
+
               GestureDetector(
                 onTap: _submit,
                 child: Container(
@@ -140,12 +119,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ],
                   ),
                   child: const Text(
-                    '가입하기',
+                    '로그인',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SignUpScreen(
+                          onSignUpSuccess: widget.onLoginSuccess,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    '계정이 없으신가요? 회원가입',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFFF9800),
                     ),
                   ),
                 ),

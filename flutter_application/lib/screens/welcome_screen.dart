@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 import 'signup_screen.dart';
+
 
 
 class WelcomeScreen extends StatelessWidget {
   final VoidCallback onGoToSignUp;
-  //final VoidCallback onLoginSuccess;
+  final VoidCallback onGoToLogin;
 
   const WelcomeScreen({
     Key? key,
      required this.onGoToSignUp,
+     required this.onGoToLogin,
   }) : super(key: key);
 
   @override
@@ -87,9 +90,7 @@ class WelcomeScreen extends StatelessWidget {
                   _buildButton(
                     text: '말동이 사용 중이에요',
                     isPrimary: false,
-                    onTap: () {
-                      // TODO: 로그인 후 홈 화면 이동 로직 추가 예정
-                    },
+                    onTap: onGoToLogin,
                   ),
 
                   const SizedBox(height: 40),
