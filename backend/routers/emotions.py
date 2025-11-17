@@ -1,7 +1,8 @@
 # 😊 감정 분석 API
 from fastapi import APIRouter, HTTPException
 from models.schemas import InputData, EmotionResponse
-from services.emotion_service import emotion_service
+# from services.emotion_service import emotion_service
+from services.emotion_service import process_emotion_analysis
 from datetime import datetime
 import uuid
 
@@ -14,16 +15,17 @@ async def predict(data: InputData):
     """
     try:
         # 감정 분석 수행
-        result = await emotion_service.analyze_text_emotion(data.text, data.user_id)
+        result = await process_emotion_analysis(data.text, data.user_id)
         
         return EmotionResponse(
             emotion=result["emotion"],
             confidence=result["confidence"],
-            risk_score=result["risk_score"],
+            risk_score=result["risk_score"], 
             needs_alert=result["needs_alert"],
-            analysis_id=str(uuid.uuid4()),
-            user_id=data.user_id,
-            timestamp=datetime.now()
+            analysis_id=result["analysis_id"],
+            user_id=result["user_id"], 
+            timestamp=result["timestamp"],
+            message=result["message"]
         )
         
     except Exception as e:
