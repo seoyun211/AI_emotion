@@ -3,12 +3,14 @@ import 'call_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenSettings;
-  final VoidCallback onStartCall;   // ✅ 콜백
+  final VoidCallback onStartCall; // ✅ 콜백
+  final Widget avatar;
 
   const HomeScreen({
     super.key,
     required this.onOpenSettings,
     required this.onStartCall,
+    required this.avatar,
   });
 
   @override
@@ -137,8 +139,7 @@ class HomeScreen extends StatelessWidget {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.transparent,
                               shadowColor: Colors.transparent,
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 20),
+                              padding: const EdgeInsets.symmetric(vertical: 20),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(24),
                               ),
@@ -146,7 +147,7 @@ class HomeScreen extends StatelessWidget {
                             onPressed: () {
                               // 디버그용 로그
                               debugPrint('[HOME] 영상통화 버튼 클릭');
-                              onStartCall();     // ✅ 여기서 호출!
+                              onStartCall(); // ✅ 여기서 호출!
                             },
                             icon: const Icon(
                               Icons.phone,
@@ -178,8 +179,7 @@ class HomeScreen extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    const CallHistoryScreen(),
+                                builder: (context) => const CallHistoryScreen(),
                               ),
                             );
                           },
