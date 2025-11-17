@@ -8,8 +8,21 @@ __pycache__/
 .env
 node_modules/
 
+#표정 데이터
+processed_data/
+failed_images/
+test_images/
+cache/
+
+#모델
+models/
+*.pt
+yolov8n.pt
+.DS_Store
+
 # Face model - 데이터/캐시 폴더 무시
 face_model/cache/
 face_model/processed_data/
 face_model/test_images/
 face_model/failed_images/
+

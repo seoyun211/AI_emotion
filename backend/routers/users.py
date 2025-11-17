@@ -1,10 +1,18 @@
 # routers/users.py
 from fastapi import APIRouter, HTTPException
+<<<<<<< HEAD
 from pydantic import BaseModel
 from datetime import date, datetime
+=======
+from backend.models.schemas import UserCreate, UserResponse
+from backend.database.crud import UserCRUD
+from datetime import datetime
+import uuid
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
 
 from database.session import get_db_connection
 
+<<<<<<< HEAD
 router = APIRouter(prefix="/api/v1/users", tags=["사용자"])
 
 
@@ -64,6 +72,29 @@ def create_user(user: UserCreate):
             guardian_name=user.guardian_name,
             guardian_phone=user.guardian_phone,
             created_at=datetime.now(),  # DB NOW()와 거의 동일
+=======
+# 사용자 등록
+@router.post("/users/register", response_model=UserResponse)
+def register_user(user_data: UserCreate):
+    try:
+        user_info = {
+            "username": user_data.username,
+            "gender": user_data.gender,
+            "birth_date": user_data.birth_date, 
+            "address": user_data.address,
+            "guardian_name": user_data.guardian_name,
+            "guardian_phone": user_data.guardian_phone,
+            
+        }
+
+        new_user_id = UserCRUD.create_user(user_info)
+        
+        return UserResponse(
+            user_id=new_user_id,
+            username=user_data.username,
+            message="사용자 등록 성공",
+            timestamp=datetime.now()
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
         )
 
     except Exception as e:

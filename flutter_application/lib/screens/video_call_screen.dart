@@ -1,5 +1,15 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
+import '../maldong_avatar.dart';
+
+// ✅ 네 Ready Player Me 아바타 GLB URL (여자)
+const String kFemaleAvatarUrl =
+    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
+
+// 필요하면 남자도 나중에 쓰려고 미리 빼둬도 됨
+const String kMaleAvatarUrl =
+    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
 
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
@@ -17,9 +27,24 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
+  final List<String> _backgrounds = [
+    'assets/background/cafe.png',
+    'assets/background/office.png',
+    'assets/background/bed.png',
+    'assets/background/home.png',
+    'assets/background/beach.png',
+    'assets/background/park.png',
+  ];
+
+  late String _selectedBackground;
+
   @override
   void initState() {
     super.initState();
+    // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
+    final random = Random();
+    _selectedBackground = _backgrounds[random.nextInt(_backgrounds.length)];
+
     _startTimer();
   }
 
@@ -53,6 +78,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
+<<<<<<< HEAD
                   // 배경 + 가운데 AI 친구
                   Container(
                     decoration: const BoxDecoration(
@@ -61,60 +87,30 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
+=======
+                  // 0) 🔹 랜덤 배경 이미지
+                  Positioned.fill(
+                    child: Image.asset(
+                      _selectedBackground,
+                      fit: BoxFit.cover,
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                     ),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 190,
-                            height: 190,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [Color(0xFFEC407A), Color(0xFFAB47BC)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black45,
-                                  blurRadius: 16,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.person,
-                                size: 90,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          const Text(
-                            'AI 친구',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _formatTime(_seconds),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 24,
-                            ),
-                          ),
-                        ],
+                  ),
+                  // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
+                  Positioned.fill(
+                    child: Transform.scale(
+                      scale: 1.15, // 👉 아바타 조금 키운 부분
+                      child: const MaldongAvatar(
+                        avatarUrl: kFemaleAvatarUrl,
                       ),
                     ),
                   ),
 
+<<<<<<< HEAD
                   // 상단 왼쪽: 통화 중
+=======
+                  // 2) 상단 왼쪽: 통화 중 + 시간 표시
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     left: 16,
@@ -139,26 +135,43 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '통화 중',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '통화 중',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _formatTime(_seconds), // mm:ss
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
                   ),
 
+<<<<<<< HEAD
                   // 상단 오른쪽: 내 화면
+=======
+                  // 3) 상단 오른쪽: 내 캠 미리보기 박스
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     right: 16,
                     child: Container(
-                      width: 120,
-                      height: 160,
+                      width: 200,
+                      height: 280,
                       decoration: BoxDecoration(
                         color: Colors.grey[900],
                         borderRadius: BorderRadius.circular(20),
@@ -190,7 +203,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
+<<<<<<< HEAD
                   // 하단 컨트롤
+=======
+                  // 4) 하단 컨트롤 버튼들
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -237,7 +254,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _circleButton(
                           icon: Icons.videocam,
                           onTap: () {
+<<<<<<< HEAD
                             // TODO: 카메라 전환
+=======
+                            // TODO: 카메라 ON/OFF
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                           },
                         ),
                       ],

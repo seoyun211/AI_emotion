@@ -1,7 +1,7 @@
 # backend/database/session.py 내용
-
-import pymysql.cursors
 from config import DATABASE_CONFIG
+import pymysql.cursors
+
 
 # -------------------------
 ## 💾 DB 연결 관리
