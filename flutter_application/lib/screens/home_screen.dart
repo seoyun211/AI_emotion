@@ -3,7 +3,7 @@ import 'call_history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback onOpenSettings;
-  final VoidCallback onStartCall;
+  final VoidCallback onStartCall;   // ✅ 콜백
 
   const HomeScreen({
     super.key,
@@ -15,6 +15,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        // 배경 그라디언트
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
@@ -29,6 +30,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 상단 인사 + 설정
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -84,6 +86,7 @@ class HomeScreen extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 24),
                     child: Column(
                       children: [
+                        // 영상 영역
                         AspectRatio(
                           aspectRatio: 16 / 9,
                           child: Container(
@@ -109,6 +112,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
 
+                        // 🔶 영상통화 시작 버튼
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -139,7 +143,11 @@ class HomeScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(24),
                               ),
                             ),
-                            onPressed: onStartCall,
+                            onPressed: () {
+                              // 디버그용 로그
+                              debugPrint('[HOME] 영상통화 버튼 클릭');
+                              onStartCall();     // ✅ 여기서 호출!
+                            },
                             icon: const Icon(
                               Icons.phone,
                               size: 32,
@@ -168,9 +176,10 @@ class HomeScreen extends StatelessWidget {
                           title: '통화기록',
                           onTap: () {
                             Navigator.push(
-                              context, 
+                              context,
                               MaterialPageRoute(
-                                builder: (context) => const CallHistoryScreen(),
+                                builder: (context) =>
+                                    const CallHistoryScreen(),
                               ),
                             );
                           },
