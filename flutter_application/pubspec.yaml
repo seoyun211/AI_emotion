@@ -37,10 +37,10 @@ flutter:
 
   assets:
     - assets/background/
-    - assets/background/icon/
+    - assets/icon/
 
 # ✅ flutter_launcher_icons 설정
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/background/icon/icon.png"
+  image_path: "assets/icon/icon.png"
