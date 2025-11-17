@@ -3,20 +3,14 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../maldong_avatar.dart';
 
-// ✅ Ready Player Me 아바타 GLB URL (여자)
-const String kFemaleAvatarUrl =
-    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
-
-// 필요하면 남자도 나중에 쓰려고 미리 빼둬도 됨
-const String kMaleAvatarUrl =
-    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
-
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
+  final Widget avatar;
 
   const VideoCallScreen({
     super.key,
     required this.onEndCall,
+    required this.avatar,
   });
 
   @override
@@ -42,16 +36,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void initState() {
     super.initState();
     // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
-    final random = Random();
-    _selectedBackground = _backgrounds[random.nextInt(_backgrounds.length)];
-
+    _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
     _startTimer();
   }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
-        _seconds += 1;
+        _seconds++;
       });
     });
   }
@@ -86,13 +78,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
+                  // 1) 🔹 가운데 3D 아바타 (widget.avatar 사용)
                   Positioned.fill(
                     child: Transform.scale(
-                      scale: 1.15, // 👉 아바타 조금 키운 부분
-                      child: const MaldongAvatar(
-                        avatarUrl: kFemaleAvatarUrl,
-                      ),
+                      scale: 0.9, // 필요하면 크기 조절
+                      child: widget.avatar,
                     ),
                   ),
 
@@ -134,7 +124,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _formatTime(_seconds), // mm:ss
+                                _formatTime(_seconds),
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 14,
@@ -203,7 +193,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
-                            widget.onEndCall(); // ✅ 메인으로 신호 보냄
+                            widget.onEndCall();
                           },
                           child: Container(
                             width: 90,
