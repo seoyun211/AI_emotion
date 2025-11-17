@@ -1,12 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-<<<<<<< HEAD
-=======
 #from routers.auth import router as auth_router
 from database.session import get_db_connection
->>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
-
 from routers import users, calls, analyses
 
 app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
