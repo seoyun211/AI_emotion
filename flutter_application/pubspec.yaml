@@ -11,20 +11,38 @@ dependencies:
   flutter:
     sdk: flutter
 
+<<<<<<< HEAD
   # 아이콘 / 날짜 관련
+=======
+  # 기본 패키지들
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
   cupertino_icons: ^1.0.8
   intl: ^0.19.0
   provider: ^6.1.2
   shared_preferences: ^2.2.2
 
+<<<<<<< HEAD
   # ✅ HTTP 통신용 Dio 패키지
   dio: ^5.7.0
+=======
+  # ✅ 아바타 3D 표시용 패키지
+  model_viewer_plus: ^1.9.3
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+<<<<<<< HEAD
 
+=======
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
   flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
+<<<<<<< HEAD
+=======
+
+  assets:
+    - assets/background/
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
