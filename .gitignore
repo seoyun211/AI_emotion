@@ -7,3 +7,9 @@ __pycache__/
 *.pyc
 .env
 node_modules/
+
+# Face model - 데이터/캐시 폴더 무시
+face_model/cache/
+face_model/processed_data/
+face_model/test_images/
+face_model/failed_images/
