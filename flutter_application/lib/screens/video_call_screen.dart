@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';   // ✅ 카메라 패키지
+import '../main.dart';                // ✅ 여기서 global cameras 사용
 import '../maldong_avatar.dart';
 
 // ✅ Ready Player Me 아바타 GLB URL (여자)
@@ -27,6 +30,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
+  // ✅ 카메라 관련 필드
+  CameraController? _cameraController;
+  bool _isCameraOn = false;
+
   final List<String> _backgrounds = [
     'assets/background/cafe.png',
     'assets/background/office.png',
@@ -48,6 +55,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _startTimer();
   }
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _cameraController?.dispose();   // ✅ 카메라도 같이 정리
+    super.dispose();
+  }
+
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
@@ -56,16 +70,44 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
   String _formatTime(int seconds) {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  // ✅ 카메라 초기화
+  Future<void> _initCamera() async {
+    if (cameras.isEmpty) return; // main.dart에서 가져온 전역 cameras
+
+    final camera = cameras.first; // 필요하면 전/후면 골라서 사용
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false,
+    );
+
+    await controller.initialize();
+
+    if (!mounted) return;
+    setState(() {
+      _cameraController = controller;
+      _isCameraOn = true;
+    });
+  }
+
+  // ✅ 카메라 ON/OFF 토글
+  Future<void> _toggleCamera() async {
+    if (_isCameraOn) {
+      await _cameraController?.dispose();
+      if (!mounted) return;
+      setState(() {
+        _cameraController = null;
+        _isCameraOn = false;
+      });
+    } else {
+      await _initCamera();
+    }
   }
 
   @override
@@ -151,36 +193,49 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   Positioned(
                     top: 16,
                     right: 16,
-                    child: Container(
+                    child: SizedBox(
                       width: 200,
                       height: 280,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
+                      child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black54,
-                            blurRadius: 12,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(20)),
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFFFCA28), Color(0xFFFF7043)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: Colors.white70,
-                            size: 40,
-                          ),
-                        ),
+                        child: _isCameraOn &&
+                                _cameraController != null &&
+                                _cameraController!.value.isInitialized
+                            ? CameraPreview(_cameraController!) // ✅ 실제 카메라 미리보기
+                            : GestureDetector(
+                                onTap: _toggleCamera, // 탭해서 켜기
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFCA28),
+                                        Color(0xFFFF7043),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white70,
+                                        size: 40,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        '카메라 켜기',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -203,7 +258,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
-                            widget.onEndCall(); // ✅ 메인으로 신호 보냄
+                            widget.onEndCall();
                           },
                           child: Container(
                             width: 90,
@@ -230,10 +285,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         ),
                         const SizedBox(width: 24),
                         _circleButton(
-                          icon: Icons.videocam,
-                          onTap: () {
-                            // TODO: 카메라 ON/OFF
-                          },
+                          icon: _isCameraOn
+                              ? Icons.videocam_off
+                              : Icons.videocam, // ✅ 상태에 따라 아이콘 변경
+                          onTap: _toggleCamera, // ✅ 아래 버튼으로도 ON/OFF
                         ),
                       ],
                     ),
