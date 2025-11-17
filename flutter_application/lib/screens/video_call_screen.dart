@@ -65,9 +65,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   String _formatTime(int seconds) {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
-    final m = mins.toString().padLeft(2, '0');
-    final s = secs.toString().padLeft(2, '0');
-    return '$m:$s';
+    return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -80,11 +78,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
+<<<<<<< HEAD
+                  // 배경 + 가운데 AI 친구
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF4A148C), Color(0xFF0D47A1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+=======
                   // 0) 🔹 랜덤 배경 이미지
                   Positioned.fill(
                     child: Image.asset(
                       _selectedBackground,
                       fit: BoxFit.cover,
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                     ),
                   ),
                   // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
@@ -97,7 +106,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
+<<<<<<< HEAD
+                  // 상단 왼쪽: 통화 중
+=======
                   // 2) 상단 왼쪽: 통화 중 + 시간 표시
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     left: 16,
@@ -148,7 +161,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
+<<<<<<< HEAD
+                  // 상단 오른쪽: 내 화면
+=======
                   // 3) 상단 오른쪽: 내 캠 미리보기 박스
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     top: 16,
                     right: 16,
@@ -186,7 +203,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
+<<<<<<< HEAD
+                  // 하단 컨트롤
+=======
                   // 4) 하단 컨트롤 버튼들
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -203,7 +224,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         const SizedBox(width: 24),
                         GestureDetector(
                           onTap: () {
-                            widget.onEndCall();
+                            debugPrint('[CALL] 통화 종료 버튼 클릭');
+                            widget.onEndCall();   // ✅ 메인으로 신호 보냄
                           },
                           child: Container(
                             width: 90,
@@ -232,7 +254,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _circleButton(
                           icon: Icons.videocam,
                           onTap: () {
+<<<<<<< HEAD
+                            // TODO: 카메라 전환
+=======
                             // TODO: 카메라 ON/OFF
+>>>>>>> 679b4b754f95c1f623f2147650cfa9d5abaf8eb4
                           },
                         ),
                       ],
