@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'call_history_screen.dart';
+import '../screens/video_call_screen.dart';
+import '../maldong_avatar.dart';
+
+const customAvatarUrl = 'assets/model.glb';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
@@ -170,7 +174,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () {
         debugPrint('[HOME] 영상통화 버튼 클릭');
-        widget.onStartCall();
+
+        // Navigator를 사용해서 바로 VideoCallScreen으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VideoCallScreen(
+              onEndCall: () {
+                Navigator.pop(context); // 통화 종료하면 돌아오기
+              },
+              avatar: MaldongAvatar(url: customAvatarUrl),
+            ),
+          ),
+        );
       },
       child: Container(
         width: double.infinity,
