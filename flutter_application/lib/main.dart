@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
@@ -45,23 +46,24 @@ class MalDongApp extends StatelessWidget {
               child: child!,
             );
           },
-          home: const _AppRoot(),
+          home: AppRoot(),
         );
       },
     );
   }
 }
 
-enum AppScreen { welcome, signup, home, videocall, settings }
+enum AppScreen { welcome, login, signup, home, videocall, settings }
 
-class _AppRoot extends StatefulWidget {
-  const _AppRoot();
+class AppRoot extends StatefulWidget {
+  const AppRoot({super.key});
 
   @override
-  State<_AppRoot> createState() => _AppRootState();
+  State<AppRoot> createState() => _AppRootState();
 }
 
-class _AppRootState extends State<_AppRoot> {
+
+class _AppRootState extends State<AppRoot> {
   AppScreen _currentScreen = AppScreen.welcome;
   bool _isLoggedIn = false;
   bool _isInCall = false;
@@ -72,7 +74,13 @@ class _AppRootState extends State<_AppRoot> {
     });
   }
 
-  void _handleSignUpSuccess() {
+  void _goToLogin() {
+    setState(() {
+      _currentScreen = AppScreen.login;
+    });
+  }
+
+  void _handleLoginSuccess() {
     setState(() {
       _isLoggedIn = true;
       _currentScreen = AppScreen.home;
@@ -116,9 +124,18 @@ class _AppRootState extends State<_AppRoot> {
   Widget build(BuildContext context) {
     switch (_currentScreen) {
       case AppScreen.welcome:
-        return WelcomeScreen(onGoToSignUp: _goToSignUp);
+        return WelcomeScreen(
+          onGoToSignUp: _goToSignUp,
+          onGoToLogin: _goToLogin, // 로그인 버튼 추가
+        );
+      case AppScreen.login:
+        return LoginScreen(
+          onLoginSuccess: _handleLoginSuccess,
+        );
       case AppScreen.signup:
-        return SignUpScreen(onSignUpSuccess: _handleSignUpSuccess);
+        return SignUpScreen(
+          onSignUpSuccess: _goToLogin, // 회원가입 후 로그인 화면으로 이동
+        );
       case AppScreen.home:
         return HomeScreen(
           onOpenSettings: _goToSettings,
