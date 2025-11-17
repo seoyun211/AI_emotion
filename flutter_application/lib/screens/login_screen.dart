@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
+import '../maldong_avatar.dart';
 import 'signup_screen.dart'; // ← (필수) 회원가입 화면 import 추가
+
+const customAvatarUrl = 'assets/model.glb';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onLoginSuccess});
@@ -40,9 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => HomeScreen(
-          onOpenSettings: () {},
-          onStartCall: () {},
-        ),
+            onOpenSettings: () {},
+            onStartCall: () {},
+            avatar: MaldongAvatar(url: customAvatarUrl)),
       ),
     );
   }
@@ -82,7 +85,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 60),
-
               _buildTextField(
                 label: '전화번호',
                 controller: _phoneController,
@@ -90,16 +92,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 hintText: '010-0000-0000',
               ),
               const SizedBox(height: 20),
-
               _buildTextField(
                 label: '비밀번호',
                 controller: _passwordController,
                 obscure: true,
                 hintText: '••••••••',
               ),
-
               const SizedBox(height: 40),
-
               GestureDetector(
                 onTap: _submit,
                 child: Container(
@@ -129,9 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               Center(
                 child: TextButton(
                   onPressed: () {
@@ -187,7 +184,8 @@ class _LoginScreenState extends State<LoginScreen> {
             hintText: hintText,
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,

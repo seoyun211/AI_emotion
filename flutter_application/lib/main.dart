@@ -11,7 +11,7 @@ import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import '../maldong_avatar.dart';
+import 'maldong_avatar.dart';
 
 // GLB 파일 경로 (Fauxtolabs 모델)
 const customAvatarUrl = 'assets/model.glb';
@@ -61,7 +61,6 @@ class AppRoot extends StatefulWidget {
   @override
   State<AppRoot> createState() => _AppRootState();
 }
-
 
 class _AppRootState extends State<AppRoot> {
   AppScreen _currentScreen = AppScreen.welcome;
