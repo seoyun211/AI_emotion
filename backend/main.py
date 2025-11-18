@@ -1,9 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-#from routers.auth import router as auth_router
+
 from database.session import get_db_connection
-from routers import users, calls, analyses
+
+# HEAD (로컬)의 라우터들을 개별적으로 import
+from routers.dialogue import router as dialogue_router
+from routers.alerts import router as alerts_router
+from routers.emotions import router as emotions_router
+
+# 원격 (f3f8096de58...)의 라우터들을 모듈로 import
+from routers import users, calls, analyses 
 
 app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
 
@@ -15,12 +22,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-#app.include_router(auth_router)
 
-# ✅ 라우터 연결
+# 라우터 포함 (HEAD와 원격의 라우터를 모두 포함)
+# HEAD에서 가져온 라우터
+app.include_router(dialogue_router)
+app.include_router(alerts_router)
+app.include_router(emotions_router)
+
+# 원격에서 가져온 라우터
 app.include_router(users.router)      # /api/v1/users/...
 app.include_router(calls.router)      # /api/v1/calls/...
 app.include_router(analyses.router)   # /api/v1/analyses/...
+
+# auth 라우터는 주석 처리되어 있었으므로 그대로 둡니다.
+# app.include_router(auth_router)
 
 
 # ✅ 루트 경로
@@ -32,12 +47,20 @@ def read_root():
 # ✅ 상태 확인용 (간단 버전)
 @app.get("/health")
 def health_check():
+    # HEAD의 DB 연결 체크 로직을 포함하여 더 상세하게 만듭니다.
+    conn = get_db_connection() 
+    db_status = "connected" if conn else "disconnected"
+    
     return {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "status": "healthy", 
+        "db_status": db_status, 
+        "timestamp": datetime.now().isoformat()
     }
 
-
+# ✅ 서버 실행
+# -------------------------
+## 🔥 서버 실행 블록 (항상 파일의 가장 아래에 위치)
+# -------------------------
 if __name__ == "__main__":
     import uvicorn
 
