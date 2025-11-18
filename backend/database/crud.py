@@ -1,6 +1,7 @@
 from typing import Dict
 from datetime import datetime
 from database.session import get_db_connection
+
 class UserCRUD:
     @staticmethod
     def create_user(user_data: Dict): # Dict는 UserCreate 스키마의 내용 (username, gender 등)
@@ -8,7 +9,7 @@ class UserCRUD:
         if not connection:
             raise Exception("DB 연결 실패")
         
-       
+        
         sql = """
             INSERT INTO User (username, gender, birth_date, address, guardian_name, guardian_phone)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -82,4 +83,28 @@ class AnalysisChunkCRUD:
             print(f"Chunk 생성 중 오류: {e}")
             raise e
         
-# Session 테이블에 대한 CRUD도 유사한 방식으로 구현해야 합니다.
+class GuardianCRUD:
+    """보호자(Guardian) 관련 데이터베이스 작업을 위한 최소한의 CRUD 클래스"""
+    @staticmethod
+    def get_guardian_by_phone(phone_number: str):
+        # 보호자 전화번호로 정보를 조회하는 로직 (나중에 구현)
+        # 현재는 임포트 오류 해결을 위해 정의만 해둡니다.
+        return None
+        
+    # 필요한 다른 Guardian 관련 메서드 (예: create, update)도 여기에 추가됩니다.
+    pass
+
+class AlertCRUD:
+    """위험 알림(Alert) 관련 데이터베이스 작업을 위한 최소한의 CRUD 클래스"""
+    @staticmethod
+    def create_alert(alert_data: dict):
+        # 위험 알림을 DB에 저장하는 로직 (나중에 구현)
+        pass
+
+    @staticmethod
+    def get_pending_alerts():
+        # 미처리된 알림 목록을 조회하는 로직 (나중에 구현)
+        return []
+        
+    # 필요한 다른 Alert 관련 메서드 (예: update_status)도 여기에 추가됩니다.
+    pass
