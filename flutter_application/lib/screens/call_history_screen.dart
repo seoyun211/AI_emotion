@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'home_screen.dart';
 
 class CallHistoryScreen extends StatelessWidget {
   const CallHistoryScreen({super.key});
@@ -36,70 +37,58 @@ class CallHistoryScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+      backgroundColor: const Color(0xFFFFF8F0),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF5D4037)),
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 상단 헤더
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
-                          Icons.arrow_back,
-                          color: Colors.black87,
-                        ),
-                      ),
+      ),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 헤더
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '통화기록',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF5D4037),
                     ),
-                    const SizedBox(width: 16),
-                    const Text(
-                      '통화기록',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '말동이와의 모든 통화 내역',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 24),
 
-              // 통화 기록 리스트
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  itemCount: callHistory.length,
-                  itemBuilder: (context, index) {
-                    final call = callHistory[index];
-                    return _CallHistoryItem(call: call);
-                  },
-                ),
+            // 통화 기록 리스트
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: callHistory.length,
+                itemBuilder: (context, index) {
+                  final call = callHistory[index];
+                  return _CallHistoryItem(call: call);
+                },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -115,17 +104,17 @@ class _CallHistoryItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MM월 dd일 (E)', 'ko_KR');
     final timeFormat = DateFormat('HH:mm');
-    
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -138,42 +127,64 @@ class _CallHistoryItem extends StatelessWidget {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: _getCallTypeColor(call.type).withOpacity(0.1),
+                gradient: LinearGradient(
+                  colors: [
+                    _getCallTypeColor(call.type),
+                    _getCallTypeColor(call.type).withOpacity(0.7),
+                  ],
+                ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 _getCallTypeIcon(call.type),
-                color: _getCallTypeColor(call.type),
+                color: Colors.white,
                 size: 28,
               ),
             ),
             const SizedBox(width: 16),
-            
+
             // 정보
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     '말동이',
-                    style: const TextStyle(
-                      fontSize: 20,
+                    style: TextStyle(
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Color(0xFF5D4037),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     '${dateFormat.format(call.date)} ${timeFormat.format(call.date)}',
                     style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
+                      fontSize: 14,
+                      color: Color(0xFF8D6E63),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getCallTypeColor(call.type).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      call.type == CallType.video ? '영상통화' : '음성통화',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _getCallTypeColor(call.type),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // 통화 시간
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -182,16 +193,8 @@ class _CallHistoryItem extends StatelessWidget {
                   _formatDuration(call.duration),
                   style: const TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  call.type == CallType.video ? '영상통화' : '음성통화',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF5D4037),
                   ),
                 ),
               ],
@@ -214,9 +217,9 @@ class _CallHistoryItem extends StatelessWidget {
   Color _getCallTypeColor(CallType type) {
     switch (type) {
       case CallType.video:
-        return Colors.deepPurple;
+        return const Color(0xFFFF9800);
       case CallType.audio:
-        return Colors.blue;
+        return const Color(0xFFFFB74D);
     }
   }
 
