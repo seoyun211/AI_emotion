@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
-import 'login_screen.dart';
 import '../maldong_avatar.dart';
 import 'signup_screen.dart'; // ← (필수) 회원가입 화면 import 추가
 
