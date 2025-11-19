@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:camera/camera.dart';              // ✅ 카메라 패키지 import
+import 'package:camera/camera.dart'; // ✅ 카메라 패키지 import
 
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
@@ -13,12 +13,10 @@ import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
-import '../maldong_avatar.dart';
+import 'maldong_avatar.dart';
 
-const femaleAvatarUrl =
-    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
-const maleAvatarUrl =
-    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
+// GLB 파일 경로 (Fauxtolabs 모델)
+const customAvatarUrl = 'assets/model.glb';
 
 // ✅ 앱 전체에서 쓸 카메라 리스트 (video_call_screen에서 import해서 사용)
 late List<CameraDescription> cameras;
@@ -140,23 +138,35 @@ class _AppRootState extends State<AppRoot> {
           onGoToSignUp: _goToSignUp,
           onGoToLogin: _goToLogin,
         );
+
       case AppScreen.login:
         return LoginScreen(
           onLoginSuccess: _handleLoginSuccess,
         );
+
       case AppScreen.signup:
         return SignUpScreen(
           onSignUpSuccess: _goToLogin,
         );
+
       case AppScreen.home:
         return HomeScreen(
           onOpenSettings: _goToSettings,
           onStartCall: _startCall,
+          avatar: MaldongAvatar(url: customAvatarUrl),
         );
+
       case AppScreen.videocall:
-        return VideoCallScreen(onEndCall: _endCall);
+        return VideoCallScreen(
+          onEndCall: _endCall,
+          avatar: MaldongAvatar(url: customAvatarUrl),
+        );
+
       case AppScreen.settings:
-        return SettingsScreen(onBack: _goToHome, onLogout: _logout);
+        return SettingsScreen(
+          onBack: _goToHome,
+          onLogout: _logout,
+        );
     }
   }
 }
