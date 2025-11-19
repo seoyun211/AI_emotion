@@ -1,6 +1,13 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:record/record.dart'; // 🔊 녹음 패키지
+import 'package:path_provider/path_provider.dart'; // 🔊 저장 경로
+import 'package:permission_handler/permission_handler.dart'; // 🔊 마이크 권한
+
+import '../main.dart'; // global cameras 사용
 import '../maldong_avatar.dart';
 
 class VideoCallScreen extends StatefulWidget {
@@ -21,6 +28,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
+  // ✅ 카메라 관련 필드
+  CameraController? _cameraController;
+  bool _isCameraOn = false;
+
+  // 🔊 녹음 관련 필드
+  final Record _audioRecorder = Record();
+  String? _recordingPath;
+
   final List<String> _backgrounds = [
     'assets/background/cafe.png',
     'assets/background/office.png',
@@ -38,8 +53,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
     _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
     _startTimer();
+
+    // 🔊 통화 시작과 동시에 자동 녹음 시작
+    _startRecordingAutomatically();
   }
 
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _cameraController?.dispose();
+    _stopRecording(); // 🔊 화면 닫힐 때 녹음 종료
+    super.dispose();
+  }
+
+  // 통화 시간 타이머
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
@@ -48,16 +75,95 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
   String _formatTime(int seconds) {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  // ✅ 카메라 초기화
+  Future<void> _initCamera() async {
+    if (cameras.isEmpty) return; // main.dart에서 가져온 전역 cameras
+
+    final camera = cameras.first; // 필요하면 전/후면 골라서 사용
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.medium,
+      enableAudio: false, // 🔊 오디오는 record 패키지가 담당
+    );
+
+    await controller.initialize();
+
+    if (!mounted) return;
+    setState(() {
+      _cameraController = controller;
+      _isCameraOn = true;
+    });
+  }
+
+  // ✅ 카메라 ON/OFF 토글
+  Future<void> _toggleCamera() async {
+    if (_isCameraOn) {
+      await _cameraController?.dispose();
+      if (!mounted) return;
+      setState(() {
+        _cameraController = null;
+        _isCameraOn = false;
+      });
+    } else {
+      await _initCamera();
+    }
+  }
+
+  // 🔊 통화 들어올 때 자동 녹음 시작
+  Future<void> _startRecordingAutomatically() async {
+    // 1) 권한 요청
+    await Permission.microphone.request();
+
+    if (!await Permission.microphone.isGranted) {
+      print("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
+      return;
+    }
+
+    // 2) 녹음 시작
+    await _startRecording();
+  }
+
+  // 🔊 실제 녹음 시작
+  Future<void> _startRecording() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final path =
+          '${dir.path}/call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      _recordingPath = path;
+
+      if (await _audioRecorder.hasPermission()) {
+        await _audioRecorder.start(
+          path: path,
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          samplingRate: 44100,
+        );
+        print("🎤 녹음 시작됨 → $path");
+      } else {
+        print("❌ Record 패키지 권한 없음");
+      }
+    } catch (e) {
+      print("녹음 시작 오류: $e");
+    }
+  }
+
+  // 🔊 녹음 종료
+  Future<void> _stopRecording() async {
+    try {
+      if (await _audioRecorder.isRecording()) {
+        final path = await _audioRecorder.stop();
+        print("🛑 녹음 종료됨 → 저장됨: $path");
+      }
+    } catch (e) {
+      print("녹음 종료 오류: $e");
+    }
   }
 
   @override
@@ -141,36 +247,49 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   Positioned(
                     top: 16,
                     right: 16,
-                    child: Container(
+                    child: SizedBox(
                       width: 200,
                       height: 280,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
+                      child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black54,
-                            blurRadius: 12,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(20)),
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFFFCA28), Color(0xFFFF7043)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: Colors.white70,
-                            size: 40,
-                          ),
-                        ),
+                        child: _isCameraOn &&
+                                _cameraController != null &&
+                                _cameraController!.value.isInitialized
+                            ? CameraPreview(_cameraController!) // ✅ 실제 카메라 미리보기
+                            : GestureDetector(
+                                onTap: _toggleCamera, // 탭해서 켜기
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFFFFCA28),
+                                        Color(0xFFFF7043),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white70,
+                                        size: 40,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        '카메라 켜기',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                       ),
                     ),
                   ),
@@ -193,6 +312,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
+                            _stopRecording(); // 🔊 통화 종료할 때 녹음도 같이 종료
                             widget.onEndCall();
                           },
                           child: Container(
@@ -220,10 +340,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         ),
                         const SizedBox(width: 24),
                         _circleButton(
-                          icon: Icons.videocam,
-                          onTap: () {
-                            // TODO: 카메라 ON/OFF
-                          },
+                          icon: _isCameraOn
+                              ? Icons.videocam_off
+                              : Icons.videocam, // ✅ 상태에 따라 아이콘 변경
+                          onTap: _toggleCamera, // ✅ 아래 버튼으로도 ON/OFF
                         ),
                       ],
                     ),

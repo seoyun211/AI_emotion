@@ -1,6 +1,10 @@
 // main.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:camera/camera.dart'; // ✅ 카메라 패키지 import
+
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/signup_screen.dart';
@@ -9,17 +13,24 @@ import 'screens/home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
-import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'maldong_avatar.dart';
 
 // GLB 파일 경로 (Fauxtolabs 모델)
 const customAvatarUrl = 'assets/model.glb';
 
-void main() async {
+// ✅ 앱 전체에서 쓸 카메라 리스트 (video_call_screen에서 import해서 사용)
+late List<CameraDescription> cameras;
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ 기기 카메라 목록 미리 가져오기
+  cameras = await availableCameras();
+
+  // ✅ 한국어 날짜 로케일 설정
   await initializeDateFormatting('ko_KR', null);
   Intl.defaultLocale = 'ko_KR';
+
   runApp(
     ChangeNotifierProvider(
       create: (context) => FontSizeProvider(),
@@ -46,7 +57,7 @@ class MalDongApp extends StatelessWidget {
               child: child!,
             );
           },
-          home: AppRoot(),
+          home: const AppRoot(),
         );
       },
     );
@@ -125,16 +136,19 @@ class _AppRootState extends State<AppRoot> {
       case AppScreen.welcome:
         return WelcomeScreen(
           onGoToSignUp: _goToSignUp,
-          onGoToLogin: _goToLogin, // 로그인 버튼 추가
+          onGoToLogin: _goToLogin,
         );
+
       case AppScreen.login:
         return LoginScreen(
           onLoginSuccess: _handleLoginSuccess,
         );
+
       case AppScreen.signup:
         return SignUpScreen(
-          onSignUpSuccess: _goToLogin, // 회원가입 후 로그인 화면으로 이동
+          onSignUpSuccess: _goToLogin,
         );
+
       case AppScreen.home:
         return HomeScreen(
           onOpenSettings: _goToSettings,
@@ -149,7 +163,10 @@ class _AppRootState extends State<AppRoot> {
         );
 
       case AppScreen.settings:
-        return SettingsScreen(onBack: _goToHome, onLogout: _logout);
+        return SettingsScreen(
+          onBack: _goToHome,
+          onLogout: _logout,
+        );
     }
   }
 }
