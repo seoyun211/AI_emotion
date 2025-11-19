@@ -1,7 +1,8 @@
-
 from typing import Dict
 from datetime import datetime
 from database.session import get_db_connection
+import asyncio
+
 class UserCRUD:
     @staticmethod
     def create_user(user_data: Dict): # Dict는 UserCreate 스키마의 내용 (username, gender 등)
@@ -9,7 +10,7 @@ class UserCRUD:
         if not connection:
             raise Exception("DB 연결 실패")
         
-       
+        
         sql = """
             INSERT INTO User (username, gender, birth_date, address, guardian_name, guardian_phone)
             VALUES (%s, %s, %s, %s, %s, %s)
@@ -83,4 +84,44 @@ class AnalysisChunkCRUD:
             print(f"Chunk 생성 중 오류: {e}")
             raise e
         
-# Session 테이블에 대한 CRUD도 유사한 방식으로 구현해야 합니다.
+class GuardianCRUD:
+    """보호자(Guardian) 관련 데이터베이스 작업을 위한 최소한의 CRUD 클래스"""
+    @staticmethod
+    def get_guardian_by_phone(phone_number: str):
+        # 보호자 전화번호로 정보를 조회하는 로직 (나중에 구현)
+        # 현재는 임포트 오류 해결을 위해 정의만 해둡니다.
+        return None
+        
+    # 필요한 다른 Guardian 관련 메서드 (예: create, update)도 여기에 추가됩니다.
+    pass
+
+class AlertCRUD:
+    # 🚨 이 메서드를 AlertCRUD 클래스 내부에 추가해야 합니다.
+    @staticmethod
+    async def get_alerts_by_guardian_id(guardian_id: str):
+        """특정 보호자의 알림 목록을 DB에서 조회합니다."""
+        
+        # 동기적인 DB 조회 작업을 비동기 스레드 풀에서 실행합니다.
+        def fetch_alerts():
+            conn = get_db_connection()
+            if not conn:
+                print("❌ DB 연결 실패: 알림 조회 불가")
+                return []
+            
+            try:
+                with conn.cursor() as cursor:
+                    # 💡 실제 알림 테이블 이름과 컬럼에 맞게 쿼리를 수정하세요.
+                    sql = "SELECT * FROM Alerts WHERE guardian_id = %s ORDER BY created_at DESC"
+                    cursor.execute(sql, (guardian_id,))
+                    return cursor.fetchall()
+            except Exception as e:
+                print(f"❌ 알림 조회 중 DB 쿼리 오류: {e}")
+                return []
+                
+        # 비동기적으로 동기 함수를 호출하고 결과를 기다립니다.
+        alerts_data = await asyncio.to_thread(fetch_alerts)
+        
+        return alerts_data
+        
+    # 필요한 다른 Alert 관련 메서드 (예: update_status)도 여기에 추가됩니다.
+    pass
