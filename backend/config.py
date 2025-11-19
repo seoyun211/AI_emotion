@@ -3,6 +3,16 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
 
+#api key
+load_dotenv() 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH")
+if GOOGLE_CREDENTIALS_PATH:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_CREDENTIALS_PATH
+else:
+    print("⚠️ GOOGLE_CREDENTIALS_PATH가 .env 파일에 설정되지 않았습니다.")
+
+
 # ① 가장 안전: 이 파일이 있는 폴더의 .env를 지정
 ENV_PATH = Path(__file__).resolve().parent / ".env"
 if ENV_PATH.exists():
@@ -12,7 +22,14 @@ else:
     load_dotenv(find_dotenv())
 
 # --- 이하 그대로 ---
-APP_CONFIG = { ... }
+APP_CONFIG = {
+    "title": "말동이 감정 분석 서비스",
+    "version": "1.0.0",
+    "description": "멀티모달 감정 분석 및 돌봄 서비스 백엔드 API",
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
+}
 
 JWT_CONFIG = {
     "secret_key": os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production"),

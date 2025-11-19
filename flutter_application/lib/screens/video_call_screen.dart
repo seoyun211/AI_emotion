@@ -2,24 +2,22 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';   // ✅ 카메라 패키지
-import '../main.dart';                // ✅ 여기서 global cameras 사용
+import 'package:camera/camera.dart';
+import 'package:record/record.dart'; // 🔊 녹음 패키지
+import 'package:path_provider/path_provider.dart'; // 🔊 저장 경로
+import 'package:permission_handler/permission_handler.dart'; // 🔊 마이크 권한
+
+import '../main.dart'; // global cameras 사용
 import '../maldong_avatar.dart';
-
-// ✅ Ready Player Me 아바타 GLB URL (여자)
-const String kFemaleAvatarUrl =
-    'https://models.readyplayer.me/690d8484132e61458cf8e667.glb';
-
-// 필요하면 남자도 나중에 쓰려고 미리 빼둬도 됨
-const String kMaleAvatarUrl =
-    'https://models.readyplayer.me/690d81ec37697c47c8a85f69.glb';
 
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
+  final Widget avatar;
 
   const VideoCallScreen({
     super.key,
     required this.onEndCall,
+    required this.avatar,
   });
 
   @override
@@ -33,6 +31,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   // ✅ 카메라 관련 필드
   CameraController? _cameraController;
   bool _isCameraOn = false;
+
+  // 🔊 녹음 관련 필드
+  final Record _audioRecorder = Record();
+  String? _recordingPath;
 
   final List<String> _backgrounds = [
     'assets/background/cafe.png',
@@ -49,23 +51,26 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void initState() {
     super.initState();
     // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
-    final random = Random();
-    _selectedBackground = _backgrounds[random.nextInt(_backgrounds.length)];
-
+    _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
     _startTimer();
+
+    // 🔊 통화 시작과 동시에 자동 녹음 시작
+    _startRecordingAutomatically();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _cameraController?.dispose();   // ✅ 카메라도 같이 정리
+    _cameraController?.dispose();
+    _stopRecording(); // 🔊 화면 닫힐 때 녹음 종료
     super.dispose();
   }
 
+  // 통화 시간 타이머
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
-        _seconds += 1;
+        _seconds++;
       });
     });
   }
@@ -84,7 +89,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final controller = CameraController(
       camera,
       ResolutionPreset.medium,
-      enableAudio: false,
+      enableAudio: false, // 🔊 오디오는 record 패키지가 담당
     );
 
     await controller.initialize();
@@ -110,6 +115,57 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
+  // 🔊 통화 들어올 때 자동 녹음 시작
+  Future<void> _startRecordingAutomatically() async {
+    // 1) 권한 요청
+    await Permission.microphone.request();
+
+    if (!await Permission.microphone.isGranted) {
+      print("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
+      return;
+    }
+
+    // 2) 녹음 시작
+    await _startRecording();
+  }
+
+  // 🔊 실제 녹음 시작
+  Future<void> _startRecording() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final path =
+          '${dir.path}/call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      _recordingPath = path;
+
+      if (await _audioRecorder.hasPermission()) {
+        await _audioRecorder.start(
+          path: path,
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          samplingRate: 44100,
+        );
+        print("🎤 녹음 시작됨 → $path");
+      } else {
+        print("❌ Record 패키지 권한 없음");
+      }
+    } catch (e) {
+      print("녹음 시작 오류: $e");
+    }
+  }
+
+  // 🔊 녹음 종료
+  Future<void> _stopRecording() async {
+    try {
+      if (await _audioRecorder.isRecording()) {
+        final path = await _audioRecorder.stop();
+        print("🛑 녹음 종료됨 → 저장됨: $path");
+      }
+    } catch (e) {
+      print("녹음 종료 오류: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -128,13 +184,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                     ),
                   ),
 
-                  // 1) 🔹 아바타를 전체 화면에 + 살짝 확대
+                  // 1) 🔹 가운데 3D 아바타 (widget.avatar 사용)
                   Positioned.fill(
                     child: Transform.scale(
-                      scale: 1.15, // 👉 아바타 조금 키운 부분
-                      child: const MaldongAvatar(
-                        avatarUrl: kFemaleAvatarUrl,
-                      ),
+                      scale: 0.9, // 필요하면 크기 조절
+                      child: widget.avatar,
                     ),
                   ),
 
@@ -176,7 +230,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                _formatTime(_seconds), // mm:ss
+                                _formatTime(_seconds),
                                 style: const TextStyle(
                                   color: Colors.white70,
                                   fontSize: 14,
@@ -258,6 +312,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
+                            _stopRecording(); // 🔊 통화 종료할 때 녹음도 같이 종료
                             widget.onEndCall();
                           },
                           child: Container(
