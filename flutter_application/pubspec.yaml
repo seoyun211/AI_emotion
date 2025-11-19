@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  camera: ^0.11.0+2
+
   # 기본 패키지들
   cupertino_icons: ^1.0.8
   intl: ^0.19.0
@@ -23,12 +25,18 @@ dependencies:
   # 아바타 3D 표시용 패키지
   model_viewer_plus: ^1.9.3
 
+  # 🔊 오디오 녹음 + 업로드용 패키지
+  http: ^1.2.0
+  record: ^5.0.0
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
 
+# ✅ flutter_launcher_icons 설정 (한 번만!)
 flutter_icons:
   android: true
   ios: true
@@ -39,6 +47,6 @@ flutter:
 
   assets:
     - assets/background/
-    - assets/background/icon/
+    - assets/icon/
     - assets/avatar/
     - assets/model.glb
