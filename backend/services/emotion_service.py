@@ -185,7 +185,8 @@ async def process_emotion_analysis(text: str, user_id: Optional[str] = None) -> 
     current_time = datetime.now()
     
     # 2. 분석 결과 DB 저장 (클래스 외부 함수 호출)
-    db_message = save_analysis_chunk(
+    db_message = await asyncio.to_thread(
+        save_analysis_chunk, 
         text=text, 
         emotion=analysis_result['emotion'], 
         risk_score=analysis_result['risk_score'],
