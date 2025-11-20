@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
-import 'login_screen.dart';
-import '../maldong_avatar.dart';
-import 'signup_screen.dart'; // ← (필수) 회원가입 화면 import 추가
-
-const customAvatarUrl = 'assets/model.glb';
+import 'signup_screen.dart'; // 회원가입 화면
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLoginSuccess});
+  const LoginScreen({
+    super.key,
+    required this.onLoginSuccess,
+  });
+
   final VoidCallback onLoginSuccess;
 
   @override
@@ -34,20 +33,14 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // TODO: 실제 로그인 로직
+    // TODO: 실제 로그인 로직 (백엔드 연동 예정)
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('로그인 성공!')),
     );
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HomeScreen(
-            onOpenSettings: () {},
-            onStartCall: () {},
-            avatar: MaldongAvatar(url: customAvatarUrl)),
-      ),
-    );
+    // 🔥 여기서 직접 HomeScreen으로 push하지 말고
+    // 부모에게 "로그인 성공했어!" 라고 알려주기만 함
+    widget.onLoginSuccess();
   }
 
   @override
@@ -57,10 +50,12 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF5D4037)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF5D4037)),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -132,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Center(
                 child: TextButton(
                   onPressed: () {
-                    Navigator.pushReplacement(
+                    Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => SignUpScreen(
@@ -196,7 +191,8 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFFF9800), width: 2),
+              borderSide:
+                  const BorderSide(color: Color(0xFFFF9800), width: 2),
             ),
           ),
           style: const TextStyle(fontSize: 16),
