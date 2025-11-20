@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
 import 'call_history_screen.dart';
 import '../screens/video_call_screen.dart';
-import '../maldong_avatar.dart';
-
-const customAvatarUrl = 'assets/model.glb';
 
 class HomeScreen extends StatefulWidget {
-  final VoidCallback onOpenSettings;
   final VoidCallback onStartCall;
   final Widget avatar;
+  final VoidCallback onOpenSettings;
 
   const HomeScreen({
     super.key,
-    required this.onOpenSettings,
     required this.onStartCall,
     required this.avatar,
+    required this.onOpenSettings,
   });
 
   @override
@@ -41,7 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // 감정 상태 배너
                     _buildEmotionBanner(),
-
                     const SizedBox(height: 40),
 
                     Padding(
@@ -50,7 +46,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           // 중앙 대화 버튼
                           _buildChatButton(),
-
                           const SizedBox(height: 32),
 
                           // 기능 카드들
@@ -80,7 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   color: const Color(0xFFFFAB91),
                                   onTap: () {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('건강기록 화면')),
+                                      const SnackBar(
+                                        content: Text('건강기록 화면'),
+                                      ),
                                     );
                                   },
                                 ),
@@ -175,7 +172,10 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         debugPrint('[HOME] 영상통화 버튼 클릭');
 
-        // Navigator를 사용해서 바로 VideoCallScreen으로 이동
+        // 부모 쪽 콜백 (필요하면 로깅/상태 업데이트 등)
+        widget.onStartCall();
+
+        // 바로 VideoCallScreen으로 이동
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -183,7 +183,8 @@ class _HomeScreenState extends State<HomeScreen> {
               onEndCall: () {
                 Navigator.pop(context); // 통화 종료하면 돌아오기
               },
-              avatar: MaldongAvatar(url: customAvatarUrl),
+              // 이미 상위에서 만든 avatar 위젯 그대로 전달
+              avatar: widget.avatar,
             ),
           ),
         );
@@ -277,6 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 _selectedIndex = 2;
               });
+              // 설정 화면 열기 → 부모에서 네비게이션 처리
               widget.onOpenSettings();
             },
           ),
