@@ -2,16 +2,10 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-<<<<<<< HEAD
 import 'package:flutter/foundation.dart' show kIsWeb; // 🔍 웹 여부 체크
 import 'package:camera/camera.dart';
-import 'package:record/record.dart'; // 🔊 녹음 패키지 (v6.x)
+import 'package:record/record.dart'; // 🔊 녹음 패키지 (v6.x → AudioRecorder)
 import 'package:path_provider/path_provider.dart'; // 🔊 저장 경로 (모바일/데스크탑용)
-=======
-import 'package:camera/camera.dart';
-import 'package:record/record.dart'; // 🔊 녹음 패키지
-import 'package:path_provider/path_provider.dart'; // 🔊 저장 경로
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
 import 'package:permission_handler/permission_handler.dart'; // 🔊 마이크 권한
 
 import '../main.dart'; // global cameras 사용
@@ -39,13 +33,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   CameraController? _cameraController;
   bool _isCameraOn = false;
 
-<<<<<<< HEAD
   // 🔊 녹음 관련 필드 (record v6.x → AudioRecorder 사용)
   final AudioRecorder _audioRecorder = AudioRecorder();
-=======
-  // 🔊 녹음 관련 필드
-  final Record _audioRecorder = Record();
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
   String? _recordingPath;
 
   final List<String> _backgrounds = [
@@ -62,8 +51,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   void initState() {
     super.initState();
+
     // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
     _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
+
     _startTimer();
 
     // 🔊 통화 시작과 동시에 자동 녹음 시작
@@ -129,24 +120,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   // 🔊 통화 들어올 때 자동 녹음 시작
   Future<void> _startRecordingAutomatically() async {
-<<<<<<< HEAD
     // 👉 웹(Chrome)에서는 녹음/로컬 파일 경로 사용 안 함
     if (kIsWeb) {
       debugPrint('🌐 Web 환경에서는 오디오 녹음을 수행하지 않습니다.');
       return;
     }
 
-=======
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
     // 1) 권한 요청
     await Permission.microphone.request();
 
     if (!await Permission.microphone.isGranted) {
-<<<<<<< HEAD
       debugPrint("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
-=======
-      print("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
       return;
     }
 
@@ -157,21 +141,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   // 🔊 실제 녹음 시작
   Future<void> _startRecording() async {
     try {
-<<<<<<< HEAD
       if (kIsWeb) {
         debugPrint('🌐 Web에서는 _startRecording()가 동작하지 않도록 막혀 있습니다.');
         return;
       }
 
-=======
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
       final dir = await getApplicationDocumentsDirectory();
       final path =
           '${dir.path}/call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
       _recordingPath = path;
 
-<<<<<<< HEAD
       // record v6.x API
       if (await _audioRecorder.hasPermission()) {
         await _audioRecorder.start(
@@ -188,43 +168,23 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       }
     } catch (e) {
       debugPrint("녹음 시작 오류: $e");
-=======
-      if (await _audioRecorder.hasPermission()) {
-        await _audioRecorder.start(
-          path: path,
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          samplingRate: 44100,
-        );
-        print("🎤 녹음 시작됨 → $path");
-      } else {
-        print("❌ Record 패키지 권한 없음");
-      }
-    } catch (e) {
-      print("녹음 시작 오류: $e");
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
     }
   }
 
   // 🔊 녹음 종료
   Future<void> _stopRecording() async {
     try {
-<<<<<<< HEAD
-      // web에서도 호출될 수 있으니 isRecording()만 체크
+      // 웹에서는 플러그인 자체가 없을 수 있으니 바로 리턴
+      if (kIsWeb) {
+        return;
+      }
+
       if (await _audioRecorder.isRecording()) {
         final path = await _audioRecorder.stop();
         debugPrint("🛑 녹음 종료됨 → 저장됨: $path");
       }
     } catch (e) {
       debugPrint("녹음 종료 오류: $e");
-=======
-      if (await _audioRecorder.isRecording()) {
-        final path = await _audioRecorder.stop();
-        print("🛑 녹음 종료됨 → 저장됨: $path");
-      }
-    } catch (e) {
-      print("녹음 종료 오류: $e");
->>>>>>> ae970574f871eef46d17945a0f06623f61dbbb7e
     }
   }
 
