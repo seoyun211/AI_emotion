@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // 🔍 웹 여부 체크
+import 'package:flutter/foundation.dart' show kIsWeb; // 🌐 웹 여부 체크
 import 'package:camera/camera.dart';
-import 'package:record/record.dart'; // 🔊 녹음 패키지 (v6.x → AudioRecorder)
-import 'package:path_provider/path_provider.dart'; // 🔊 저장 경로 (모바일/데스크탑용)
-import 'package:permission_handler/permission_handler.dart'; // 🔊 마이크 권한
+import 'package:record/record.dart'; // 🔊 record v6.x
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../main.dart'; // global cameras 사용
 import '../maldong_avatar.dart';
@@ -33,7 +33,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   CameraController? _cameraController;
   bool _isCameraOn = false;
 
-  // 🔊 녹음 관련 필드 (record v6.x → AudioRecorder 사용)
+  // 🔊 record v6.x → AudioRecorder 사용
   final AudioRecorder _audioRecorder = AudioRecorder();
   String? _recordingPath;
 
@@ -52,24 +52,31 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void initState() {
     super.initState();
 
-    // 🎲 통화 화면 들어올 때 배경 한 개 랜덤 선택
+    // 🎲 랜덤 배경 선택
     _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
 
+    // ⏱ 통화 타이머 시작
     _startTimer();
 
-    // 🔊 통화 시작과 동시에 자동 녹음 시작 (📱 모바일/데스크탑만, Web은 스킵)
-    _startRecordingAutomatically();
+    // 🔊 모바일/데스크탑 앱에서만 녹음 자동 시작 (웹에서는 스킵)
+    if (!kIsWeb) {
+      _startRecordingAutomatically();
+    } else {
+      debugPrint('🌐 Web: 녹음 자동 시작 안 함');
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _cameraController?.dispose();
-    _stopRecording(); // 🔊 화면 닫힐 때 녹음 종료
+    _stopRecording(); // 🔊 화면 닫힐 때 녹음 종료 (실제로 녹음 중일 때만)
     super.dispose();
   }
 
-  // 통화 시간 타이머
+  // =========================
+  // ⏱ 타이머 관련
+  // =========================
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -85,30 +92,38 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  // ✅ 카메라 초기화
+  // =========================
+  // 📷 카메라 관련
+  // =========================
   Future<void> _initCamera() async {
-    // 🌐 웹에서는 카메라 플러그인 쓰지 않음
+    // 🌐 웹에서는 카메라 사용 안 함 → 그냥 안내만
     if (kIsWeb) {
       debugPrint('🌐 Web: 카메라 초기화 스킵');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이 환경에서는 카메라를 사용할 수 없어요.')),
+        );
+      }
       return;
     }
 
+    // 전역 카메라 리스트가 비어있으면 그냥 스킵
     if (cameras.isEmpty) {
-      debugPrint('🚫 사용 가능한 카메라 없음');
+      debugPrint('🚫 사용 가능한 카메라가 없습니다 (cameras 리스트 비어 있음)');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사용할 수 있는 카메라가 없어요.')),
+          const SnackBar(content: Text('사용 가능한 카메라가 없습니다.')),
         );
       }
       return;
     }
 
     try {
-      final camera = cameras.first; // 필요하면 전/후면 골라서 사용
+      final camera = cameras.first;
       final controller = CameraController(
         camera,
         ResolutionPreset.medium,
-        enableAudio: false, // 🔊 오디오는 record 패키지가 담당
+        enableAudio: false, // 🔊 오디오는 record에서 처리
       );
 
       await controller.initialize();
@@ -120,26 +135,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       });
     } catch (e) {
       debugPrint('📷 카메라 초기화 실패: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('카메라를 사용할 수 없어요. (장치 없음 또는 권한 문제)'),
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('카메라를 초기화할 수 없어요.')),
+      );
     }
   }
 
-  // ✅ 카메라 ON/OFF 토글
   Future<void> _toggleCamera() async {
-    // 🌐 웹에서는 카메라 미리보기 지원 X
+    // 🌐 웹에서는 카메라 토글도 막기
     if (kIsWeb) {
-      debugPrint('🌐 Web: 카메라 버튼 눌림 (지원 안 함)');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('웹에서는 카메라 미리보기를 지원하지 않아요.')),
-        );
-      }
+      debugPrint('🌐 Web: 카메라 토글 동작 안 함');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('웹 환경에서는 카메라 기능을 사용하지 않아요.')),
+      );
       return;
     }
 
@@ -155,37 +164,34 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // 🔊 통화 들어올 때 자동 녹음 시작
+  // =========================
+  // 🎤 오디오 녹음 관련
+  // =========================
+
+  // 통화 들어올 때 자동 녹음 시작 (모바일/데스크탑용)
   Future<void> _startRecordingAutomatically() async {
-    // 👉 웹(Chrome)에서는 녹음/로컬 파일 경로 사용 안 함
+    // 웹은 녹음 스킵
     if (kIsWeb) {
-      debugPrint('🌐 Web 환경에서는 오디오 녹음을 수행하지 않습니다.');
+      debugPrint('🌐 Web: 녹음 스킵');
       return;
     }
 
-    // 1) 권한 요청
+    // 권한 요청
     final status = await Permission.microphone.request();
-
     if (!status.isGranted) {
-      debugPrint("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
+      debugPrint('❌ 마이크 권한이 없어 녹음을 시작할 수 없음');
       return;
     }
 
-    // 2) 녹음 시작
     await _startRecording();
   }
 
-  // 🔊 실제 녹음 시작
   Future<void> _startRecording() async {
     try {
-      if (kIsWeb) {
-        debugPrint('🌐 Web에서는 _startRecording()가 동작하지 않도록 막혀 있습니다.');
-        return;
-      }
-
-      final hasPermission = await _audioRecorder.hasPermission();
-      if (!hasPermission) {
-        debugPrint("❌ Record 패키지 권한 없음");
+      // record v6.x 권한 체크
+      final hasPerm = await _audioRecorder.hasPermission();
+      if (!hasPerm) {
+        debugPrint('❌ Record 패키지에서 녹음 권한 확인 실패');
         return;
       }
 
@@ -195,7 +201,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
       _recordingPath = path;
 
-      // record v6.x API
       await _audioRecorder.start(
         const RecordConfig(
           encoder: AudioEncoder.aacLc,
@@ -204,28 +209,28 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ),
         path: path,
       );
-      debugPrint("🎤 녹음 시작됨 → $path");
+
+      debugPrint('🎤 녹음 시작됨 → $path');
     } catch (e) {
-      debugPrint("녹음 시작 오류: $e");
+      debugPrint('녹음 시작 오류: $e');
     }
   }
 
-  // 🔊 녹음 종료
   Future<void> _stopRecording() async {
     try {
-      // 웹에서는 플러그인 자체가 없을 수 있으니 바로 리턴
-      if (kIsWeb) {
-        return;
-      }
-
-      if (await _audioRecorder.isRecording()) {
+      final isRec = await _audioRecorder.isRecording();
+      if (isRec) {
         final path = await _audioRecorder.stop();
-        debugPrint("🛑 녹음 종료됨 → 저장됨: $path");
+        debugPrint('🛑 녹음 종료됨 → 저장 위치: $path');
       }
     } catch (e) {
-      debugPrint("녹음 종료 오류: $e");
+      debugPrint('녹음 종료 오류: $e');
     }
   }
+
+  // =========================
+  // 🧱 UI
+  // =========================
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +253,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   // 1) 🔹 가운데 3D 아바타 (widget.avatar 사용)
                   Positioned.fill(
                     child: Transform.scale(
-                      scale: 0.9, // 필요하면 크기 조절
+                      scale: 0.9,
                       child: widget.avatar,
                     ),
                   ),
@@ -316,9 +321,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         child: _isCameraOn &&
                                 _cameraController != null &&
                                 _cameraController!.value.isInitialized
-                            ? CameraPreview(_cameraController!) // ✅ 실제 카메라 미리보기
+                            ? CameraPreview(_cameraController!)
                             : GestureDetector(
-                                onTap: _toggleCamera, // 탭해서 켜기
+                                onTap: _toggleCamera,
                                 child: Container(
                                   decoration: const BoxDecoration(
                                     gradient: LinearGradient(
@@ -366,14 +371,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _circleButton(
                           icon: Icons.chat_bubble_outline,
                           onTap: () {
-                            // TODO: 통화 중 채팅
+                            // TODO: 통화 중 채팅 기능
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('채팅 기능은 준비 중입니다.')),
+                            );
                           },
                         ),
                         const SizedBox(width: 24),
                         GestureDetector(
                           onTap: () {
                             debugPrint('[CALL] 통화 종료 버튼 클릭');
-                            _stopRecording(); // 🔊 통화 종료할 때 녹음도 같이 종료
+                            _stopRecording();
                             widget.onEndCall();
                           },
                           child: Container(
@@ -403,8 +411,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         _circleButton(
                           icon: _isCameraOn
                               ? Icons.videocam_off
-                              : Icons.videocam, // ✅ 상태에 따라 아이콘 변경
-                          onTap: _toggleCamera, // ✅ 아래 버튼으로도 ON/OFF
+                              : Icons.videocam,
+                          onTap: _toggleCamera,
                         ),
                       ],
                     ),
