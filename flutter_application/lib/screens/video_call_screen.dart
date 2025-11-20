@@ -57,7 +57,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     _startTimer();
 
-    // 🔊 통화 시작과 동시에 자동 녹음 시작
+    // 🔊 통화 시작과 동시에 자동 녹음 시작 (📱 모바일/데스크탑만, Web은 스킵)
     _startRecordingAutomatically();
   }
 
@@ -72,6 +72,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   // 통화 시간 타이머
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
       setState(() {
         _seconds++;
       });
@@ -86,26 +87,62 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   // ✅ 카메라 초기화
   Future<void> _initCamera() async {
-    if (cameras.isEmpty) return; // main.dart에서 가져온 전역 cameras
+    // 🌐 웹에서는 카메라 플러그인 쓰지 않음
+    if (kIsWeb) {
+      debugPrint('🌐 Web: 카메라 초기화 스킵');
+      return;
+    }
 
-    final camera = cameras.first; // 필요하면 전/후면 골라서 사용
-    final controller = CameraController(
-      camera,
-      ResolutionPreset.medium,
-      enableAudio: false, // 🔊 오디오는 record 패키지가 담당
-    );
+    if (cameras.isEmpty) {
+      debugPrint('🚫 사용 가능한 카메라 없음');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('사용할 수 있는 카메라가 없어요.')),
+        );
+      }
+      return;
+    }
 
-    await controller.initialize();
+    try {
+      final camera = cameras.first; // 필요하면 전/후면 골라서 사용
+      final controller = CameraController(
+        camera,
+        ResolutionPreset.medium,
+        enableAudio: false, // 🔊 오디오는 record 패키지가 담당
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _cameraController = controller;
-      _isCameraOn = true;
-    });
+      await controller.initialize();
+
+      if (!mounted) return;
+      setState(() {
+        _cameraController = controller;
+        _isCameraOn = true;
+      });
+    } catch (e) {
+      debugPrint('📷 카메라 초기화 실패: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('카메라를 사용할 수 없어요. (장치 없음 또는 권한 문제)'),
+          ),
+        );
+      }
+    }
   }
 
   // ✅ 카메라 ON/OFF 토글
   Future<void> _toggleCamera() async {
+    // 🌐 웹에서는 카메라 미리보기 지원 X
+    if (kIsWeb) {
+      debugPrint('🌐 Web: 카메라 버튼 눌림 (지원 안 함)');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('웹에서는 카메라 미리보기를 지원하지 않아요.')),
+        );
+      }
+      return;
+    }
+
     if (_isCameraOn) {
       await _cameraController?.dispose();
       if (!mounted) return;
@@ -127,9 +164,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
 
     // 1) 권한 요청
-    await Permission.microphone.request();
+    final status = await Permission.microphone.request();
 
-    if (!await Permission.microphone.isGranted) {
+    if (!status.isGranted) {
       debugPrint("❌ 마이크 권한이 없어 녹음을 시작할 수 없음");
       return;
     }
@@ -146,6 +183,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         return;
       }
 
+      final hasPermission = await _audioRecorder.hasPermission();
+      if (!hasPermission) {
+        debugPrint("❌ Record 패키지 권한 없음");
+        return;
+      }
+
       final dir = await getApplicationDocumentsDirectory();
       final path =
           '${dir.path}/call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
@@ -153,19 +196,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       _recordingPath = path;
 
       // record v6.x API
-      if (await _audioRecorder.hasPermission()) {
-        await _audioRecorder.start(
-          const RecordConfig(
-            encoder: AudioEncoder.aacLc,
-            bitRate: 128000,
-            sampleRate: 44100,
-          ),
-          path: path,
-        );
-        debugPrint("🎤 녹음 시작됨 → $path");
-      } else {
-        debugPrint("❌ Record 패키지 권한 없음");
-      }
+      await _audioRecorder.start(
+        const RecordConfig(
+          encoder: AudioEncoder.aacLc,
+          bitRate: 128000,
+          sampleRate: 44100,
+        ),
+        path: path,
+      );
+      debugPrint("🎤 녹음 시작됨 → $path");
     } catch (e) {
       debugPrint("녹음 시작 오류: $e");
     }
