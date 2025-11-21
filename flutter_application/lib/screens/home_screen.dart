@@ -278,8 +278,11 @@ class _HomeScreenState extends State<HomeScreen> {
             isSelected: _selectedIndex == 1,
             onTap: () {
               setState(() => _selectedIndex = 1);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('감정기록 화면')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmotionRecordScreen(),
+                ),
               );
             },
           ),
