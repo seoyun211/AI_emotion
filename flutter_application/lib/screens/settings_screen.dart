@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'font_size_screen.dart';
 import 'guardian_screen.dart';
+import 'profile_edit_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback onBack;
@@ -65,8 +66,15 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     _SettingsItem(
                       icon: Icons.person,
-                      title: '프로필 설정',
-                      onTap: () {},
+                      title: '기본 정보 수정',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileEditScreen(),
+                          ),
+                        );
+                      },
                     ),
                     Divider(height: 1, color: Colors.grey[200]),
                     _SettingsItem(
