@@ -13,6 +13,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _birthController = TextEditingController();
   final _guardianPhoneController = TextEditingController();
 
   @override
@@ -20,6 +21,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
+    _birthController.dispose();
     _guardianPhoneController.dispose();
     super.dispose();
   }
@@ -27,7 +29,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _submit() {
     if (_phoneController.text.trim().isEmpty ||
         _passwordController.text.trim().isEmpty ||
-        _nameController.text.trim().isEmpty) {
+        _nameController.text.trim().isEmpty ||
+        _birthController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('모든 항목을 입력해주세요')),
       );
@@ -93,6 +96,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 label: '이름',
                 controller: _nameController,
                 hintText: '홍길동',
+              ),
+              const SizedBox(height: 20),
+              
+              _buildTextField(
+                label: '생년월일',
+                controller: _birthController,
+                keyboardType: TextInputType.datetime,
+                hintText: 'YYYY-MM-DD',
               ),
               const SizedBox(height: 20),
               
