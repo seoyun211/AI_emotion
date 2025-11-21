@@ -3,6 +3,7 @@ import 'call_history_screen.dart';
 import 'settings_screen.dart';
 import '../screens/video_call_screen.dart';
 import '../maldong_avatar.dart';
+import 'emotion_recode_screen.dart';
 
 const customAvatarUrl = 'assets/model.glb';
 
@@ -277,8 +278,11 @@ class _HomeScreenState extends State<HomeScreen> {
             isSelected: _selectedIndex == 1,
             onTap: () {
               setState(() => _selectedIndex = 1);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('감정기록 화면')),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmotionRecordScreen(),
+                ),
               );
             },
           ),
