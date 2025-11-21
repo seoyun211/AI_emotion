@@ -3,6 +3,7 @@ import 'call_history_screen.dart';
 import 'settings_screen.dart';
 import '../screens/video_call_screen.dart';
 import '../maldong_avatar.dart';
+import 'emotion_recode_screen.dart';
 
 const customAvatarUrl = 'assets/model.glb';
 
