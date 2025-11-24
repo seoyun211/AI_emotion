@@ -1,56 +1,44 @@
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
+import 'elderly_signup_screen.dart';
 
-class SignUpScreen extends StatefulWidget {
-  final VoidCallback? onSignUpSuccess; 
-  const SignUpScreen({super.key, this.onSignUpSuccess});
+class ElderlyLoginScreen extends StatefulWidget {
+  const ElderlyLoginScreen({
+    super.key,
+    required this.onLoginSuccess,
+  });
+
+  final VoidCallback onLoginSuccess;
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<ElderlyLoginScreen> createState() => _ElderlyLoginScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _ElderlyLoginScreenState extends State<ElderlyLoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _guardianPhoneController = TextEditingController();
 
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
-    _guardianPhoneController.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (_phoneController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty ||
-        _nameController.text.trim().isEmpty) {
+        _passwordController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('모든 항목을 입력해주세요')),
+        const SnackBar(content: Text('전화번호와 비밀번호를 입력해주세요')),
       );
       return;
     }
-    
-    // TODO: 실제 회원가입 로직
+
+    // TODO: 실제 로그인 로직 (userType: 'elderly')
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('회원가입 완료!')),
+      const SnackBar(content: Text('어르신 로그인 성공!')),
     );
 
-    // 회원가입 성공 callback 실행 (null-safe)
-    widget.onSignUpSuccess?.call();
-
-    // 회원가입 후 로그인 화면으로 이동
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => LoginScreen(
-          onLoginSuccess: () {}, // 빈 callback 필요 시 이렇게 처리 가능
-        ),
-      ),
-    );
+    widget.onLoginSuccess();
   }
 
   @override
@@ -60,10 +48,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF5D4037)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF5D4037)),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -71,31 +61,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '회원가입',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF5D4037),
-                ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF9800).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      color: Color(0xFFFF9800),
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    '어르신 로그인',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF5D4037),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               const Text(
-                '말동이와 함께 시작해요',
+                '다시 만나서 반가워요',
                 style: TextStyle(
                   fontSize: 16,
                   color: Color(0xFF8D6E63),
                 ),
               ),
-              const SizedBox(height: 40),
-              
-              _buildTextField(
-                label: '이름',
-                controller: _nameController,
-                hintText: '홍길동',
-              ),
-              const SizedBox(height: 20),
-              
+              const SizedBox(height: 60),
               _buildTextField(
                 label: '전화번호',
                 controller: _phoneController,
@@ -103,24 +102,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 hintText: '010-0000-0000',
               ),
               const SizedBox(height: 20),
-              
               _buildTextField(
                 label: '비밀번호',
                 controller: _passwordController,
                 obscure: true,
                 hintText: '••••••••',
               ),
-              const SizedBox(height: 20),
-              
-              _buildTextField(
-                label: '보호자 전화번호',
-                controller: _guardianPhoneController,
-                keyboardType: TextInputType.phone,
-                hintText: '010-1234-5678',
-              ),
-              
               const SizedBox(height: 40),
-              
               GestureDetector(
                 onTap: _submit,
                 child: Container(
@@ -140,12 +128,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ],
                   ),
                   child: const Text(
-                    '가입하기',
+                    '로그인',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ElderlySignUpScreen(
+                          onSignUpSuccess: widget.onLoginSuccess,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    '계정이 없으신가요? 회원가입',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFFFF9800),
                     ),
                   ),
                 ),
@@ -184,7 +194,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             hintText: hintText,
             filled: true,
             fillColor: Colors.white,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
@@ -195,7 +206,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFFF9800), width: 2),
+              borderSide:
+                  const BorderSide(color: Color(0xFFFF9800), width: 2),
             ),
           ),
           style: const TextStyle(fontSize: 16),
