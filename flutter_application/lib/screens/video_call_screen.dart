@@ -166,14 +166,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final hasPerm = await _audioRecorder.hasPermission();
       if (!hasPerm) return;
 
-      String? path;
+      // record 패키지에서 path가 required String 이라서
+      // 무조건 non-null 문자열을 만들어서 넘긴다.
+      final fakeFileName =
+          'call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+      String filePath;
 
       if (!kIsWeb) {
         final dir = await getApplicationDocumentsDirectory();
-        path =
-            '${dir.path}/call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        _recordingPath = path;
+        filePath = '${dir.path}/$fakeFileName';
+      } else {
+        // 웹에서는 파일 시스템 경로 개념이 없으니 이름만 넘겨도 됨
+        filePath = fakeFileName;
       }
+
+      _recordingPath = filePath;
 
       await _audioRecorder.start(
         const RecordConfig(
@@ -181,10 +189,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           bitRate: 128000,
           sampleRate: 44100,
         ),
-        path: path,
+        path: filePath,
       );
 
-      debugPrint("녹음 시작됨");
+      debugPrint("녹음 시작됨: $filePath");
     } catch (e) {
       debugPrint("녹음 오류: $e");
     }
@@ -195,6 +203,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final isRec = await _audioRecorder.isRecording();
       if (isRec) {
         await _audioRecorder.stop();
+        debugPrint("녹음 종료됨, path: $_recordingPath");
       }
     } catch (e) {
       debugPrint("녹음 종료 오류: $e");
