@@ -12,7 +12,7 @@ import 'screens/elderly/elderly_login_screen.dart';
 import 'screens/guardian/guardian_signup_screen.dart';
 import 'screens/guardian/guardian_login_screen.dart';
 import 'screens/home_screen.dart';
-//import 'screens/guardian_home_screen.dart';
+import 'screens/guardian/guardian_home_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
@@ -215,56 +215,9 @@ class _AppRootState extends State<AppRoot> {
         );
 
       case AppScreen.guardianHome:
-        // TODO: 보호자용 홈 화면 구현 필요
-        return Scaffold(
-          backgroundColor: const Color(0xFFFFF8F0),
-          body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.family_restroom,
-                  size: 100,
-                  color: Color(0xFF66BB6A),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  '보호자 홈 화면',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF5D4037),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  '준비 중입니다',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Color(0xFF8D6E63),
-                  ),
-                ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: _logout,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF66BB6A),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
-                  ),
-                  child: const Text(
-                    '로그아웃',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return GuardianHomeScreen(
+          onOpenSettings: _goToSettings,
+          onLogout: _logout,
         );
 
       case AppScreen.videocall:
