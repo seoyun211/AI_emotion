@@ -2,34 +2,56 @@ from typing import Dict
 from datetime import datetime
 from database.session import get_db_connection
 import asyncio
+import bcrypt
+
+def hash_password(password: str) -> str:
+    """비밀번호를 해싱하고 문자열로 반환합니다."""
+    # 비밀번호를 바이트로 인코딩하고, salt를 생성하여 해싱합니다.
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed.decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """평문 비밀번호와 해시된 비밀번호를 비교합니다."""
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'), 
+            hashed_password.encode('utf-8')
+        )
+    except ValueError:
+        # 해시 형식이 잘못된 경우 (예: DB에 빈 문자열 저장)
+        return False
 
 class UserCRUD:
     @staticmethod
-    def create_user(user_data: Dict): # Dict는 UserCreate 스키마의 내용 (username, gender 등)
+    def create_user(user_data: Dict):
         connection = get_db_connection()
         if not connection:
             raise Exception("DB 연결 실패")
         
+        plain_password = user_data.get('password')
+        if not plain_password:
+            raise ValueError("비밀번호 정보가 누락되었습니다.")
+            
+        password_hash = hash_password(plain_password)
         
         sql = """
-            INSERT INTO User (username, gender, birth_date, address, guardian_name, guardian_phone)
+            INSERT INTO User (username, password_hash, role, gender, birth_date, address)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
         
         params = (
             user_data['username'],
+            password_hash,
+            user_data['role'],
             user_data['gender'],
-            user_data['birth_date'], # FastAPI Pydantic이 Date 객체로 변환해준다고 가정
-            user_data.get('address'),
-            user_data.get('guardian_name'),
-            user_data.get('guardian_phone'),
+            user_data['birth_date'],
+            user_data.get('address')
         )
         
         try:
             with connection.cursor() as cursor:
                 cursor.execute(sql, params)
             connection.commit()
-            # AUTO_INCREMENT로 생성된 user_id를 반환
             return cursor.lastrowid
         except Exception as e:
             connection.rollback()
@@ -37,17 +59,19 @@ class UserCRUD:
             raise e
 
     @staticmethod
-    def get_user(user_id: int):
+    def get_user_by_username(username: str) -> Dict | None:
+        """사용자 이름으로 사용자 정보(비밀번호 해시 포함)를 조회합니다."""
         connection = get_db_connection()
         if not connection:
             return None
             
-        sql = "SELECT * FROM User WHERE user_id = %s"
+        # password_hash, user_id, role을 포함하여 로그인에 필요한 모든 정보 조회
+        sql = "SELECT user_id, username, password_hash, role FROM User WHERE username = %s"
         
         try:
             with connection.cursor() as cursor:
-                cursor.execute(sql, (user_id,))
-                return cursor.fetchone()
+                cursor.execute(sql, (username,))
+                return cursor.fetchone() # 딕셔너리 형태로 반환
         except Exception:
             return None
 
@@ -61,13 +85,15 @@ class AnalysisChunkCRUD:
         
         # SQL: AnalysisChunk 테이블의 칼럼명과 순서를 정확히 일치시킵니다.
         sql = """
-            INSERT INTO AnalysisChunk (session_id, analysis_time, text_result, audio_result, face_result, final_result)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO AnalysisChunk (session_id, user_id, analysis_id, analysis_time, text_result, audio_result, face_result, final_result)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         params = (
             chunk_data['session_id'],
-            datetime.now(), # analysis_time은 현재 시간으로 설정
+            chunk_data['user_id'],   
+            chunk_data['analysis_id'],  
+            datetime.now(), 
             chunk_data.get('text_result'),
             chunk_data.get('audio_result'),
             chunk_data.get('face_result'),
@@ -85,21 +111,60 @@ class AnalysisChunkCRUD:
             raise e
         
 class GuardianCRUD:
-    """보호자(Guardian) 관련 데이터베이스 작업을 위한 최소한의 CRUD 클래스"""
+    """보호자-피보호자 관계(GuardianRelationship) 관리 클래스"""
+    
     @staticmethod
-    def get_guardian_by_phone(phone_number: str):
-        # 보호자 전화번호로 정보를 조회하는 로직 (나중에 구현)
-        # 현재는 임포트 오류 해결을 위해 정의만 해둡니다.
-        return None
+    def create_relationship(guardian_id: int, ward_id: int):
+        """보호자와 피보호자 사이에 관리 관계를 생성합니다."""
+        connection = get_db_connection()
+        if not connection:
+            raise Exception("DB 연결 실패")
+            
+        sql = """
+            INSERT INTO GuardianRelationship (guardian_user_id, ward_user_id)
+            VALUES (%s, %s)
+        """
+        params = (guardian_id, ward_id)
         
-    # 필요한 다른 Guardian 관련 메서드 (예: create, update)도 여기에 추가됩니다.
-    pass
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, params)
+            connection.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            connection.rollback()
+            print(f"관계 생성 중 오류: {e}")
+            raise e
 
-class AlertCRUD:
-    # 🚨 이 메서드를 AlertCRUD 클래스 내부에 추가해야 합니다.
     @staticmethod
-    async def get_alerts_by_guardian_id(guardian_id: str):
-        """특정 보호자의 알림 목록을 DB에서 조회합니다."""
+    def get_wards_by_guardian_id(guardian_id: int) -> list[Dict]:
+        """특정 보호자가 관리하는 모든 피보호자의 user_id와 username을 조회합니다."""
+        connection = get_db_connection()
+        if not connection:
+            return []
+            
+        sql = """
+            SELECT 
+                U.user_id, 
+                U.username, 
+                GR.relationship_id
+            FROM GuardianRelationship AS GR
+            JOIN User AS U ON GR.ward_user_id = U.user_id
+            WHERE GR.guardian_user_id = %s
+        """
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (guardian_id,))
+                return cursor.fetchall()
+            
+        except Exception:
+            return []
+        
+class AlertCRUD:
+    @staticmethod
+    async def get_alerts_by_guardian_id(guardian_id: int):
+        """특정 보호자가 관리하는 모든 피보호자의 알림 목록을 DB에서 조회합니다."""
         
         # 동기적인 DB 조회 작업을 비동기 스레드 풀에서 실행합니다.
         def fetch_alerts():
@@ -110,8 +175,17 @@ class AlertCRUD:
             
             try:
                 with conn.cursor() as cursor:
-                    # 💡 실제 알림 테이블 이름과 컬럼에 맞게 쿼리를 수정하세요.
-                    sql = "SELECT * FROM Alerts WHERE guardian_id = %s ORDER BY created_at DESC"
+                    sql = """
+                        SELECT 
+                            A.*, 
+                            U.username AS ward_username 
+                        FROM Alert AS A
+                        JOIN GuardianRelationship AS GR ON A.user_id = GR.ward_user_id
+                        JOIN User AS U ON A.user_id = U.user_id
+                        WHERE GR.guardian_user_id = %s 
+                        ORDER BY A.triggered_at DESC
+                    """
+                    
                     cursor.execute(sql, (guardian_id,))
                     return cursor.fetchall()
             except Exception as e:
@@ -122,6 +196,3 @@ class AlertCRUD:
         alerts_data = await asyncio.to_thread(fetch_alerts)
         
         return alerts_data
-        
-    # 필요한 다른 Alert 관련 메서드 (예: update_status)도 여기에 추가됩니다.
-    pass
