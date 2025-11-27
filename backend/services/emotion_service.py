@@ -1,12 +1,7 @@
 # backend/services/emotion_service.py
 
-# --- 임포트 ---
-from models.clients.text_client import text_client
-from models.clients.voice_client import voice_client
-from models.clients.face_client import face_client
-from models.clients.multimodal_client import client_manager
-
-from models.emotion_analyzer import analyze_emotion # 실제 감정 분석 모델 함수
+from models.clients.multimodal_client import multimodal_client
+from models.emotion_analyzer import analyze_emotion  # 텍스트 기본 감정 분석 모델
 from config import MODEL_WEIGHTS
 from database.session import get_db_connection
 
@@ -16,45 +11,55 @@ import uuid
 from datetime import datetime
 from fastapi import HTTPException
 
-# -----------------------------------------------------
-# EmotionService 클래스 (분석/통합 로직만 담당)
-# -----------------------------------------------------
 
 class EmotionService:
     @staticmethod
     async def analyze_text_emotion(text: str, user_id: Optional[str] = None) -> Dict:
-        """텍스트 감정 분석 (멀티모델)"""
-        tasks = []
-        
-        # 🚨 1. 기본 감정 분석 (동기 함수이므로 바로 실행)
-        basic_result = analyze_emotion(text) 
-        
-        # 🚨 2. 외부 모델 호출 (비동기이므로 tasks에 추가)
-        if text_client.enabled:
-            # tasks.append(asyncio.create_task(asyncio.sleep(0).__await__().__iter__().__next__())) 
-            # ☝️ 이 불필요한 줄을 제거하고
-            tasks.append(asyncio.create_task(text_client.analyze_emotion(text, user_id)))
-        
-        # 기본 결과를 첫 번째 결과로 설정 (tasks가 비어있을 수 있으므로 주의)
-        results = [basic_result]
-        
-        # 3. 외부 모델 결과 수집 (비동기 결과만 gather)
-        if tasks:
-             external_results = await asyncio.gather(*tasks, return_exceptions=True)
-             results.extend([r for r in external_results if not isinstance(r, Exception)])
-        
-        # 결과 통합
-        return await EmotionService._integrate_results(results, "text")
+        """
+        텍스트-only 감정 분석.
+        지금은 내부 BERT 기반 analyze_emotion(text) 결과만 사용.
+        """
+        basic_result = analyze_emotion(text)  # 동기 함수라고 가정
+        # basic_result 형식 예:
+        # {"emotion": "...", "confidence": 0.8, "risk_score": 0.2, "model": "text"}
+
+        # 통합 로직 재사용 (실제로는 모델 1개지만, 구조 통일을 위해 사용)
+        return await EmotionService._integrate_results([basic_result], "text")
     
     @staticmethod
-    async def _integrate_results(results: List, analysis_type: str) -> Dict:
+    async def analyze_multimodal_emotion(
+        text: Optional[str],
+        image_bytes: Optional[bytes],
+        audio_bytes: Optional[bytes],
+        user_id: Optional[str] = None,
+    ) -> Dict:
+        """
+        ✅ 통합 퓨전 모델(이미지+텍스트+음성)을 사용하는 감정 분석
+        - multimodal_client(= EmotionAnalyzer 래퍼)를 한 번만 호출
+        """
+        fusion_result = await multimodal_client.analyze_emotion(
+            text=text,
+            image_bytes=image_bytes,
+            audio_bytes=audio_bytes,
+            user_id=user_id,
+        )
+
+        # 기존 통합 로직(_integrate_results)을 재사용
+        integrated = await EmotionService._integrate_results(
+            [fusion_result],
+            analysis_type="multimodal",
+        )
+        return integrated
+
+    @staticmethod
+    async def _integrate_results(results: List[Dict], analysis_type: str) -> Dict:
         """여러 모델 결과 통합"""
-        valid_results = []
+        valid_results: List[Dict] = []
         
         for result in results:
             if isinstance(result, Exception):
                 continue
-            if result.get("success", True):  # 성공한 결과만
+            if result.get("success", True):  # success 키 없으면 True로 간주
                 valid_results.append(result)
         
         if not valid_results:
@@ -80,8 +85,8 @@ class EmotionService:
     @staticmethod
     async def _weighted_integration(results: List[Dict]) -> Dict:
         """가중치 기반 감정 통합"""
-        emotion_scores = {}
-        confidence_sum = 0
+        emotion_scores: Dict[str, float] = {}
+        confidence_sum = 0.0
         
         for result in results:
             emotion = result["emotion"]
@@ -93,7 +98,7 @@ class EmotionService:
             weighted_confidence = confidence * weight
             
             if emotion not in emotion_scores:
-                emotion_scores[emotion] = 0
+                emotion_scores[emotion] = 0.0
             
             emotion_scores[emotion] += weighted_confidence
             confidence_sum += weighted_confidence
@@ -101,12 +106,17 @@ class EmotionService:
         # 가장 높은 점수의 감정 선택
         if emotion_scores:
             final_emotion = max(emotion_scores.items(), key=lambda x: x[1])
-            final_confidence = final_emotion[1] / confidence_sum if confidence_sum > 0 else 0
+            final_confidence = final_emotion[1] / confidence_sum if confidence_sum > 0 else 0.0
             
             # 위험도 계산 (가중 평균)
-            risk_scores = [r["risk_score"] * MODEL_WEIGHTS.get(r.get("model", "basic"), 0.5) 
-                          for r in results]
-            total_weight = sum(MODEL_WEIGHTS.get(r.get("model", "basic"), 0.5) for r in results)
+            risk_scores = [
+                r["risk_score"] * MODEL_WEIGHTS.get(r.get("model", "basic"), 0.5)
+                for r in results
+            ]
+            total_weight = sum(
+                MODEL_WEIGHTS.get(r.get("model", "basic"), 0.5)
+                for r in results
+            )
             final_risk = sum(risk_scores) / total_weight if total_weight > 0 else 0.3
             
             return {
@@ -122,19 +132,23 @@ class EmotionService:
             "risk_score": 0.3,
             "needs_alert": False
         }
-    
 
-# -----------------------------------------------------
-# 🚨 전역 서비스 인스턴스 (클래스 정의 직후)
-# -----------------------------------------------------
+
+# 전역 서비스 인스턴스
 emotion_service = EmotionService()
 
 
-# -----------------------------------------------------
-# 💾 DB 저장 함수 (클래스 외부에 정의)
-# -----------------------------------------------------
+# ------------------------------
+# 💾 DB 저장 함수
+# ------------------------------
 
-def save_analysis_chunk(text: str, emotion: str, risk_score: float, analysis_id: str, user_id: Optional[str] = None) -> str:
+def save_analysis_chunk(
+    text: str,
+    emotion: str,
+    risk_score: float,
+    analysis_id: str,
+    user_id: Optional[str] = None,
+) -> str:
     """분석 결과를 DB의 AnalysisChunk 테이블에 저장합니다."""
     conn = get_db_connection()
     if not conn:
@@ -142,7 +156,6 @@ def save_analysis_chunk(text: str, emotion: str, risk_score: float, analysis_id:
 
     try:
         with conn.cursor() as cursor:
-            # 🚨 쿼리가 7개의 컬럼과 7개의 %s를 가지도록 수정 (risk_score가 포함되어야 함)
             sql = """
             INSERT INTO AnalysisChunk
             (session_id, user_id, analysis_id, analysis_time, 
@@ -152,49 +165,64 @@ def save_analysis_chunk(text: str, emotion: str, risk_score: float, analysis_id:
             """
             cursor.execute(sql, (
                 1,                      # 1. session_id (int)
-                1,                      # 2. user_id (int) 
+                1,                      # 2. user_id (int)  (나중에 실제 user_id로 교체 가능)
                 analysis_id,            # 3. analysis_id (str/UUID)
-                # 4. analysis_time은 NOW()로 처리
-                text,                   # 5. text_result (str, 입력 텍스트)
-                risk_score,             # 6. risk_score (float)
-                emotion                 # 7. final_result (str, 분석된 감정)
+                # 4. analysis_time은 NOW()
+                text,                   # 5. text_result
+                risk_score,             # 6. risk_score
+                emotion                 # 7. final_result
             ))
         conn.commit()
         return " 및 DB 저장 완료"
 
     except Exception as db_e:
         conn.rollback()
-        # 🚨🚨 터미널에 출력 (로그용)
         print(f"❌❌ 최종 DB INSERT 실패 오류 (로그용): {db_e}") 
-        # 🚨🚨 오류 메시지를 문자열로 반환 (핵심 변경)
         return f"DB 저장 실패: {db_e}"
     
 
 
-# -----------------------------------------------------
-# 🚀 최종 통합 실행 함수 (라우터에서 호출됨)
-# -----------------------------------------------------
+# ------------------------------
+# 🚀 최종 통합 실행 함수 (라우터에서 호출)
+# ------------------------------
 
-async def process_emotion_analysis(text: str, user_id: Optional[str] = None) -> Dict[str, Any]:
-    """감정 분석을 실행하고 DB에 저장 후 결과를 반환하는 통합 함수"""
-    
-    # 1. 멀티모델 감정 분석 실행 (EmotionService 인스턴스를 통해 메서드 호출)
-    analysis_result = await emotion_service.analyze_text_emotion(text, user_id)
+async def process_emotion_analysis(
+    text: str,
+    user_id: Optional[str] = None,
+    image_bytes: Optional[bytes] = None,
+    audio_bytes: Optional[bytes] = None,
+) -> Dict[str, Any]:
+    """
+    감정 분석을 실행하고 DB에 저장 후 결과를 반환하는 통합 함수
+    - audio_bytes / image_bytes 가 있으면 👉 멀티모달(퓨전 모델)
+    - 없으면 👉 텍스트-only 분석
+    """
+    # 1. 감정 분석 실행
+    if audio_bytes is not None or image_bytes is not None:
+        # 🔥 멀티모달(퓨전) 사용
+        analysis_result = await emotion_service.analyze_multimodal_emotion(
+            text=text,
+            image_bytes=image_bytes,
+            audio_bytes=audio_bytes,
+            user_id=user_id,
+        )
+    else:
+        # 텍스트-only
+        analysis_result = await emotion_service.analyze_text_emotion(text, user_id)
     
     analysis_id = str(uuid.uuid4())
     current_time = datetime.now()
     
-    # 2. 분석 결과 DB 저장 (클래스 외부 함수 호출)
+    # 2. 분석 결과 DB 저장
     db_message = await asyncio.to_thread(
         save_analysis_chunk, 
         text=text, 
-        emotion=analysis_result['emotion'], 
-        risk_score=analysis_result['risk_score'],
+        emotion=analysis_result["emotion"], 
+        risk_score=analysis_result["risk_score"],
         analysis_id=analysis_id,
-        user_id=user_id
+        user_id=user_id,
     )
     if db_message.startswith("DB 저장 실패:"):
-        # FastAPI 라우터가 이 예외를 catch하여 500 응답으로 변환합니다.
         raise HTTPException(status_code=500, detail=f"감정 분석 중 오류: {db_message}")
     
     # 3. 최종 결과 반환
@@ -204,4 +232,4 @@ async def process_emotion_analysis(text: str, user_id: Optional[str] = None) -> 
         "user_id": user_id,
         "timestamp": current_time,
         "message": "감정 분석 완료" + db_message
-    }   
+    }

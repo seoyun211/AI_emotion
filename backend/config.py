@@ -90,4 +90,9 @@ EMOTION_MODEL_ROOT = os.getenv(
 IMAGE_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "image",  "image_model.pt")
 TEXT_PT_PATH   = os.path.join(EMOTION_MODEL_ROOT, "models", "text",   "text_model.pt")
 AUDIO_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "audio",  "audio_model.pt")
-FUSION_PT_PATH = os.path.join(EMOTION_MODEL_ROOT, "models", "fusion", "fusion_head_best.pt")
+FUSION_PT_PATH = os.path.join(
+    EMOTION_MODEL_ROOT,
+    "models",
+    "fusion",
+    "fusion_head_epoch5_acc0.43.pt"
+)
