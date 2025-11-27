@@ -1,28 +1,89 @@
-from typing import Dict, List
+# backend/models/clients/multimodal_client.py
+
+from typing import Dict, Optional
 import asyncio
-# 전부 임시
-class ClientManager:
-    """멀티 모달 클라이언트 관리 및 통합 인터페이스"""
+import io
+import tempfile
+
+from PIL import Image
+import torch
+from torchvision import transforms
+
+from models.fusion_model import get_emotion_analyzer
+
+# EfficientNet 학습 때 사용한 전처리와 반드시 맞춰야 함
+img_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],  # 코랩에서 다르게 썼다면 여기도 맞춰야 함
+        std=[0.229, 0.224, 0.225],
+    )
+])
+
+
+class MultimodalClient:
+    """
+    이미지 + 텍스트 + 음성을 받아서
+    fusion_model.EmotionAnalyzer(통합 모델)를 호출하는 클라이언트
+    """
+    enabled = True
 
     def __init__(self):
-        print("💡 ClientManager 로드 완료. (멀티 모달 통합 관리)")
-        # 여기에 통합 가중치나 설정 로직을 나중에 추가
+        print("💡 MultimodalClient(Fusion) 로드 중...")
+        self.analyzer = get_emotion_analyzer()
+        print("✅ MultimodalClient 준비 완료.")
 
-    async def integrate_results(self, results: List[Dict]) -> Dict:
-        """[임시 로직] 여러 모달의 결과를 통합합니다."""
-        await asyncio.sleep(0.01)
-        
-        # 임시로 첫 번째 유효한 결과를 최종 결과로 반환한다고 가정
-        if not results:
-            return {"final_emotion": "중립", "final_confidence": 0.0, "final_risk_score": 0.0}
-            
-        # 첫 번째 결과 반환 (Mock)
-        result = results[0]
+    async def analyze_emotion(
+        self,
+        text: Optional[str],
+        image_bytes: Optional[bytes],
+        audio_bytes: Optional[bytes],
+        user_id: Optional[str] = None,
+    ) -> Dict:
+        # 비동기 환경 양보 (필수는 아니지만 좋음)
+        await asyncio.sleep(0)
+
+        # 1) 이미지 처리 (지금 /dialogue/speak 에서는 None으로 들어올 예정)
+        if image_bytes is not None:
+            pil_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            img_tensor = img_transform(pil_img).unsqueeze(0)  # [1,3,224,224]
+        else:
+            # 이미지가 없는 경우: 0 텐서로 placeholder
+            img_tensor = torch.zeros(1, 3, 224, 224)
+
+        # 2) 오디오 bytes → 임시 wav 파일 path
+        audio_path = ""
+        if audio_bytes is not None:
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp.write(audio_bytes)
+                audio_path = tmp.name
+
+        # 3) 통합 모델 실행 (EmotionAnalyzer)
+        pred_id, pred_name, probs = self.analyzer.predict(
+            image_tensor=img_tensor,
+            text_str=text or "",
+            audio_path=audio_path,
+        )
+
+        # 🎯 라벨 순서 (fusion_model.py 기준)
+        # 0: "기쁨", 1: "당황", 2: "분노", 3: "불안", 4: "상처",
+        # 5: "슬픔", 6: "중립", 7: "역겨움", 8: "공포", 9: "놀람"
+        # 위험 감정 인덱스 (예: 분노/불안/슬픔/공포)
+        risk_indices = [2, 3, 5, 8]
+        risk_score = float(sum(probs[i] for i in risk_indices))
+
         return {
-            "final_emotion": result.get("emotion", "중립"),
-            "final_confidence": result.get("confidence", 0.5),
-            "final_risk_score": result.get("risk_score", 0.3)
+            "success": True,
+            "model": "fusion_emotion",
+            "emotion": pred_name,
+            "pred_id": pred_id,
+            "probs": probs,                      # 전체 10개 확률
+            "confidence": float(max(probs)),     # 최고 확률
+            "risk_score": risk_score,
+            "needs_alert": risk_score >= 0.6,
         }
 
-# 🚨 emotion_service에서 임포트하기 위한 인스턴스 정의
-client_manager = ClientManager()
+
+# 전역 싱글톤 인스턴스
+multimodal_client = MultimodalClient()
