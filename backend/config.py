@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv, find_dotenv
+from pathlib import Path
 
 #api key
 load_dotenv() 
@@ -79,3 +80,14 @@ DATABASE_CONFIG = {
     "dialect": "mysql",
     "driver": "pymysql"
 }
+
+# emotion_fusion 프로젝트 최상위 경로
+EMOTION_MODEL_ROOT = os.getenv(
+    "EMOTION_MODEL_ROOT",
+    r"C:\Users\user\emotion_fusion"   # 로컬에서 학습한 폴더 위치에 맞춰 수정
+)
+
+IMAGE_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "image",  "image_model.pt")
+TEXT_PT_PATH   = os.path.join(EMOTION_MODEL_ROOT, "models", "text",   "text_model.pt")
+AUDIO_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "audio",  "audio_model.pt")
+FUSION_PT_PATH = os.path.join(EMOTION_MODEL_ROOT, "models", "fusion", "fusion_head_best.pt")

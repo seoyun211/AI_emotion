@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import date, datetime
 from typing import Optional
+from typing import List
 
 # -------------------------
 # A. 기본 입력 스키마 (Emotions, Dialogue 등에서 사용)
@@ -65,3 +66,19 @@ class EmotionResponse(BaseModel):
     user_id: Optional[str] = None
     timestamp: datetime
     message: Optional[str] = None
+
+class MultiModalEmotionRequest(BaseModel):
+    """멀티모달 분석용 요청 스키마"""
+    text: str
+    image_path: str   # 서버 기준 이미지 파일 경로
+    audio_path: str   # 서버 기준 wav 파일 경로
+    user_id: Optional[str] = None
+
+class MultiModalEmotionResponse(BaseModel):
+    """멀티모달 감정 + 말동이 답변"""
+    emotion_id: int
+    emotion: str
+    probs: List[float]
+    llm_reply: str
+    user_id: Optional[str] = None
+    timestamp: datetime
