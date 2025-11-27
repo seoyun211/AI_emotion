@@ -7,10 +7,8 @@ import 'package:camera/camera.dart';
 
 import 'theme/app_theme.dart';
 import 'screens/welcome_screen.dart';
-import 'screens/elderly/elderly_signup_screen.dart';
-import 'screens/elderly/elderly_login_screen.dart';
-import 'screens/guardian/guardian_signup_screen.dart';
-import 'screens/guardian/guardian_login_screen.dart';
+import 'screens/signup_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/guardian/guardian_home_screen.dart';
 import 'screens/settings_screen.dart';
@@ -69,10 +67,8 @@ class MalDongApp extends StatelessWidget {
 
 enum AppScreen {
   welcome,
-  elderlyLogin,
-  elderlySignup,
-  guardianLogin,
-  guardianSignup,
+  signup,
+  login,
   elderlyHome,
   guardianHome,
   videocall,
@@ -94,42 +90,36 @@ class _AppRootState extends State<AppRoot> {
   bool _isLoggedIn = false;
   bool _isInCall = false;
 
-  // 어르신 회원가입
-  void _goToElderlySignUp() {
+  // 통합 회원가입 화면으로 이동
+  void _goToSignUp() {
     setState(() {
-      _userType = UserType.elderly;
-      _currentScreen = AppScreen.elderlySignup;
+      _currentScreen = AppScreen.signup;
     });
   }
 
-  // 어르신 로그인
-  void _goToElderlyLogin() {
+  // 통합 로그인 화면으로 이동
+  void _goToLogin() {
     setState(() {
-      _userType = UserType.elderly;
-      _currentScreen = AppScreen.elderlyLogin;
+      _currentScreen = AppScreen.login;
     });
   }
 
-  // 보호자 회원가입
-  void _goToGuardianSignUp() {
+  // 회원가입 성공 후 (role에 따라 로그인 화면으로)
+  void _handleSignUpSuccess(String role) {
+    // role: 'ward' (어르신) 또는 'guardian' (보호자)
     setState(() {
-      _userType = UserType.guardian;
-      _currentScreen = AppScreen.guardianSignup;
+      _userType = role == 'ward' ? UserType.elderly : UserType.guardian;
+      _currentScreen = AppScreen.login; // 회원가입 후 로그인 화면으로
     });
   }
 
-  // 보호자 로그인
-  void _goToGuardianLogin() {
-    setState(() {
-      _userType = UserType.guardian;
-      _currentScreen = AppScreen.guardianLogin;
-    });
-  }
-
-  // 로그인 성공
-  void _handleLoginSuccess() {
+  // 로그인 성공 (role 정보를 받아서 홈 화면 결정)
+  void _handleLoginSuccess(String role) {
+    // role: 'ward' (어르신) 또는 'guardian' (보호자)
     setState(() {
       _isLoggedIn = true;
+      _userType = role == 'ward' ? UserType.elderly : UserType.guardian;
+      
       if (_userType == UserType.elderly) {
         _currentScreen = AppScreen.elderlyHome;
       } else {
@@ -181,30 +171,18 @@ class _AppRootState extends State<AppRoot> {
     switch (_currentScreen) {
       case AppScreen.welcome:
         return WelcomeScreen(
-          onGoToElderlySignUp: _goToElderlySignUp,
-          onGoToElderlyLogin: _goToElderlyLogin,
-          onGoToGuardianSignUp: _goToGuardianSignUp,
-          onGoToGuardianLogin: _goToGuardianLogin,
+          onGoToSignUp: _goToSignUp,
+          onGoToLogin: _goToLogin,
         );
 
-      case AppScreen.elderlyLogin:
-        return ElderlyLoginScreen(
+      case AppScreen.signup:
+        return SignUpScreen(
+          onSignUpSuccess: _handleSignUpSuccess,
+        );
+
+      case AppScreen.login:
+        return LoginScreen(
           onLoginSuccess: _handleLoginSuccess,
-        );
-
-      case AppScreen.elderlySignup:
-        return ElderlySignUpScreen(
-          onSignUpSuccess: _goToElderlyLogin,
-        );
-
-      case AppScreen.guardianLogin:
-        return GuardianLoginScreen(
-          onLoginSuccess: _handleLoginSuccess,
-        );
-
-      case AppScreen.guardianSignup:
-        return GuardianSignUpScreen(
-          onSignUpSuccess: _goToGuardianLogin,
         );
 
       case AppScreen.elderlyHome:
