@@ -29,6 +29,7 @@ app.add_middleware(
 app.include_router(dialogue_router)
 app.include_router(alerts_router)
 app.include_router(emotions_router)
+app.include_router(multimodal_router)
 # app.include_router(auth_router)
 
 
