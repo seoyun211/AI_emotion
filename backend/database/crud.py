@@ -35,8 +35,8 @@ class UserCRUD:
         password_hash = hash_password(plain_password)
         
         sql = """
-            INSERT INTO User (username, password_hash, role, gender, birth_date, address)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO User (username, password_hash, role, gender, birth_date, address, user_phone)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
         
         params = (
@@ -45,7 +45,8 @@ class UserCRUD:
             user_data['role'],
             user_data['gender'],
             user_data['birth_date'],
-            user_data.get('address')
+            user_data.get('address'),
+            user_data['user_phone']
         )
         
         try:
@@ -59,19 +60,18 @@ class UserCRUD:
             raise e
 
     @staticmethod
-    def get_user_by_username(username: str) -> Dict | None:
-        """사용자 이름으로 사용자 정보(비밀번호 해시 포함)를 조회합니다."""
+    def get_user_by_phone(user_phone: str) -> Dict | None:
+        """전화번호(user_phone)로 사용자 정보(비밀번호 해시 포함)를 조회합니다."""
         connection = get_db_connection()
         if not connection:
             return None
             
-        # password_hash, user_id, role을 포함하여 로그인에 필요한 모든 정보 조회
-        sql = "SELECT user_id, username, password_hash, role FROM User WHERE username = %s"
+        sql = "SELECT user_id, username, password_hash, role, user_phone FROM User WHERE user_phone = %s"
         
         try:
             with connection.cursor() as cursor:
-                cursor.execute(sql, (username,))
-                return cursor.fetchone() # 딕셔너리 형태로 반환
+                cursor.execute(sql, (user_phone,))
+                return cursor.fetchone()
         except Exception:
             return None
 
