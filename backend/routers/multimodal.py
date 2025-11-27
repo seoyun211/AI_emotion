@@ -9,7 +9,7 @@ import torchvision.transforms as T
 
 from models.schemas import MultiModalEmotionRequest, MultiModalEmotionResponse
 from models.fusion_model import get_emotion_analyzer
-from services.llm_service import get_llm_response_with_emotion
+from services.LLM_service import get_llm_response_with_emotion
 
 router = APIRouter(prefix="/api/v2", tags=["멀티모달 감정 분석"])
 

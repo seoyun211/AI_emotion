@@ -2,19 +2,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import asyncio
-# DB 및 라우터 임포트 (모든 기능 활성화)
 from database.session import get_db_connection
 from routers.dialogue import router as dialogue_router
 from routers.alerts import router as alerts_router
 from routers.emotions import router as emotions_router
+from routers.users import router as users_router
+from routers.auth import router as auth_router
 from routers.multimodal import router as multimodal_router
-# from routers.auth import router as auth_router 
+
 
 # -------------------------
 ## 🚀 FastAPI 앱 및 미들웨어 설정
 # -------------------------
 app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
-
 
 # ✅ CORS 설정
 app.add_middleware(
@@ -29,8 +29,9 @@ app.add_middleware(
 app.include_router(dialogue_router)
 app.include_router(alerts_router)
 app.include_router(emotions_router)
+app.include_router(users_router)    
+app.include_router(auth_router)
 app.include_router(multimodal_router)
-# app.include_router(auth_router)
 
 
 # ✅ 루트 경로
@@ -40,13 +41,10 @@ def read_root():
 
 # ✅ 상태 확인용
 @app.get("/health")
-async def health_check(): # 👈 함수를 async로 변경해야 합니다.
-    # 동기 함수인 get_db_connection()을 to_thread로 감싸 비동기적으로 호출
+async def health_check(): 
     conn = await asyncio.to_thread(get_db_connection)
     db_status = "connected" if conn else "disconnected"
     return {"status": "healthy", "db_status": db_status, "timestamp": datetime.now().isoformat()}
-# 🚨 이전의 /predict 엔드포인트는 삭제되었습니다.
-
 
 # ✅ 서버 실행
 if __name__ == "__main__":
