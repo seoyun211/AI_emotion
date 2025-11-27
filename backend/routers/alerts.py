@@ -7,7 +7,7 @@ from datetime import datetime
 # 데이터베이스와 서비스에서 필요한 모듈을 임포트합니다.
 # (이 경로와 스키마는 사용자의 프로젝트 구조에 맞게 조정해야 합니다.)
 from database.crud import AlertCRUD 
-from database.schemas import AlertResponse, AlertBase, EmotionDataRequest # 스키마는 가상의 이름입니다.
+from models.schemas import AlertResponse, AlertCreate, EmotionCreate # 스키마는 가상의 이름입니다.
 from services.alert_service import alert_service 
 
 # 사용자 인증 종속성 (가정)
@@ -89,7 +89,7 @@ async def mark_alert_as_read(
     status_code=status.HTTP_202_ACCEPTED
 )
 async def trigger_emotion_alert_manually(
-    emotion_data_request: EmotionDataRequest # 요청 본문 스키마
+    emotion_data_request: EmotionCreate # 요청 본문 스키마
 ):
     """
     🚀 (테스트 또는 시스템 연동용) 감정 데이터를 받아 알림 생성 로직을 트리거합니다.
