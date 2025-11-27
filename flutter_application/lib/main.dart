@@ -17,7 +17,7 @@ import 'font_size_provider.dart';
 import 'maldong_avatar.dart';
 
 // GLB 파일 경로
-const customAvatarUrl = 'assets/model.glb';
+const customAvatarUrl = 'assets/maldongs.glb';
 
 // 앱 전체에서 쓸 카메라 리스트
 late List<CameraDescription> cameras;
@@ -119,7 +119,7 @@ class _AppRootState extends State<AppRoot> {
     setState(() {
       _isLoggedIn = true;
       _userType = role == 'ward' ? UserType.elderly : UserType.guardian;
-      
+
       if (_userType == UserType.elderly) {
         _currentScreen = AppScreen.elderlyHome;
       } else {

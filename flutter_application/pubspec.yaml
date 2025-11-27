@@ -51,5 +51,4 @@ flutter:
   assets:
     - assets/background/
     - assets/icon/
-    - assets/avatar/
-    - assets/model.glb
+    - assets/maldongs.glb
