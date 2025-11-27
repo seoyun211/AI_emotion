@@ -12,7 +12,7 @@ from routers.multimodal import router as multimodal_router
 
 
 # -------------------------
-## 🚀 FastAPI 앱 및 미들웨어 설정
+# 🚀 FastAPI 앱 및 미들웨어 설정
 # -------------------------
 app = FastAPI(title="말동이 감정 분석 API", version="1.0.0")
 
@@ -49,8 +49,6 @@ async def health_check():
 # ✅ 서버 실행
 if __name__ == "__main__":
     import uvicorn
-    # 서버 시작 시점에 DB 연결을 시도합니다.
     get_db_connection() 
     print("🚀 말동이 백엔드 서버 시작합니다...")
-    # 포트를 8000으로 가정합니다.
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
