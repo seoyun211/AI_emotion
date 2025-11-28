@@ -3,8 +3,37 @@ from jose import JWTError, jwt
 from fastapi import HTTPException, status
 from config import JWT_CONFIG
 from typing import Dict, Optional
-from database.crud import UserCRUD 
-from database.crud import verify_password
+from database.crud import UserCRUD, verify_password, hash_password
+from models.schemas import SignUpRequest, User
+import bcrypt
+
+def hash_password(password: str) -> str:
+    """비밀번호를 해싱하고 문자열로 반환합니다."""
+    # 비밀번호를 바이트로 인코딩하고, salt를 생성하여 해싱합니다.
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed.decode('utf-8')
+
+def create_new_user(user_data: SignUpRequest) -> User:
+    """
+    회원가입 데이터를 받아 비밀번호를 해시하고 DB에 새 사용자를 저장합니다.
+    """
+
+    hashed_password = hash_password(user_data.password) 
+    db_data = user_data.model_dump()
+
+    db_data.pop('password', None)
+    db_data['password_hash'] = hashed_password
+
+    print(f"--- [DEBUG] 최종 DB 데이터 키 확인: {db_data.keys()} ---", flush=True)
+    print(f"--- [DEBUG] password_hash 값 존재 확인: {bool(db_data.get('password_hash'))} ---", flush=True)
+
+    try:
+        new_user_from_db = UserCRUD.create_user(db_data)
+    except Exception as e:
+        # DB 제약 조건 위반 (409)은 여기서 잡고, 다시 발생시켜 400으로 처리되도록 합니다.
+        raise ValueError(f"회원가입 데이터베이스 저장 실패: {str(e)}")
+        
+    return new_user_from_db
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()

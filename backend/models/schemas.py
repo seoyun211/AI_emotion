@@ -1,7 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date, datetime
 from typing import Optional
 from typing import List
+
 
 # 기본 입력 스키마 (Emotions, Dialogue 등에서 사용)
 class InputData(BaseModel):
@@ -72,6 +73,28 @@ class AlertResponse(BaseModel):
     status: str
     chunk_id: Optional[int] = None
     message: str
+
+class SignUpRequest(BaseModel):
+    username: str = Field(..., description="이름")
+    password: str = Field(..., min_length=6, description="비밀번호 (최소 6자)")
+    user_phone: str = Field(..., description="전화번호")
+    role: str = Field(..., pattern="^(ward|guardian)$", description="역할: 'ward' 또는 'guardian'")
+    gender: str = Field(..., pattern="^(M|F)$", description="성별: 'M' 또는 'F'")
+    birth_date: date = Field(..., description="생년월일 (YYYY-MM-DD 형식)")
+    address: str | None = Field(None, description="주소 (선택 사항)")
+
+class User(BaseModel):
+    user_id: int
+    username: str
+    user_phone: str
+    role: str
+    gender: str
+    birth_date: date
+    address: str | None
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
 
 # 4. 인증 스키마
 class LoginRequest(BaseModel):

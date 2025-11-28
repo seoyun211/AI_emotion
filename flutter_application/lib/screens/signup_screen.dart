@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const String baseUrl = 'http://localhost:8080';
+const String baseUrl = 'http://localhost:8000';
 
 // ============================================
 // 회원가입 화면 - 역할 선택 포함
@@ -104,7 +104,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     print('회원가입 데이터: $signupData');
     
     try {
-      final url = Uri.parse('$baseUrl/api/auth/signup');
+      final url = Uri.parse('$baseUrl/api/v1/auth/signup');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

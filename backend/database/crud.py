@@ -5,35 +5,33 @@ import asyncio
 import bcrypt
 
 def hash_password(password: str) -> str:
-    """비밀번호를 해싱하고 문자열로 반환합니다."""
-    # 비밀번호를 바이트로 인코딩하고, salt를 생성하여 해싱합니다.
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-    return hashed.decode('utf-8')
+    pass
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """평문 비밀번호와 해시된 비밀번호를 비교합니다."""
+    # (내용은 그대로 유지)
     try:
         return bcrypt.checkpw(
             plain_password.encode('utf-8'), 
             hashed_password.encode('utf-8')
         )
     except ValueError:
-        # 해시 형식이 잘못된 경우 (예: DB에 빈 문자열 저장)
         return False
 
 class UserCRUD:
     @staticmethod
     def create_user(user_data: Dict):
+
+        print("--- [DEBUG] create_user 함수 시작 ---", flush=True)
+
         connection = get_db_connection()
         if not connection:
             raise Exception("DB 연결 실패")
         
-        plain_password = user_data.get('password')
-        if not plain_password:
-            raise ValueError("비밀번호 정보가 누락되었습니다.")
-            
-        password_hash = hash_password(plain_password)
-        
+        password_hash_value = user_data.get('password_hash')
+        if not password_hash_value:
+             raise ValueError("해시된 비밀번호 정보가 누락되었습니다.")
+                
         sql = """
             INSERT INTO User (username, password_hash, role, gender, birth_date, address, user_phone)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -41,7 +39,7 @@ class UserCRUD:
         
         params = (
             user_data['username'],
-            password_hash,
+            password_hash_value,
             user_data['role'],
             user_data['gender'],
             user_data['birth_date'],
@@ -53,10 +51,10 @@ class UserCRUD:
             with connection.cursor() as cursor:
                 cursor.execute(sql, params)
             connection.commit()
-            return cursor.lastrowid
+            return cursor.lastrowid 
         except Exception as e:
             connection.rollback()
-            print(f"User 생성 중 오류: {e}")
+            print(f"--- [ERROR] User 생성 중 오류: {e} ---", flush=True)
             raise e
 
     @staticmethod
