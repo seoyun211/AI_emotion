@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const String baseUrl = 'http://localhost:8080';
+const String baseUrl = 'http://localhost:8000';
 
 // ============================================
 // 로그인 화면
@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       // 1) 로그인 API 호출
-      final url = Uri.parse('$baseUrl/api/auth/login');
+      final url = Uri.parse('$baseUrl/api/v1/auth/login');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
