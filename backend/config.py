@@ -81,18 +81,13 @@ DATABASE_CONFIG = {
     "driver": "pymysql"
 }
 
-# emotion_fusion 프로젝트 최상위 경로
-EMOTION_MODEL_ROOT = os.getenv(
-    "EMOTION_MODEL_ROOT",
-    r"C:\Users\user\emotion_fusion"   # 로컬에서 학습한 폴더 위치에 맞춰 수정
-)
+# -------------------------
+# 📌 모델 가중치 상대경로 설정 (팀원 모두 동일하게 사용 가능)
+# -------------------------
+BASE_DIR = Path(__file__).resolve().parent   # backend/
+MODEL_DIR = BASE_DIR / "model_weights"       # backend/model_weights
 
-IMAGE_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "image",  "image_model.pt")
-TEXT_PT_PATH   = os.path.join(EMOTION_MODEL_ROOT, "models", "text",   "text_model.pt")
-AUDIO_PT_PATH  = os.path.join(EMOTION_MODEL_ROOT, "models", "audio",  "audio_model.pt")
-FUSION_PT_PATH = os.path.join(
-    EMOTION_MODEL_ROOT,
-    "models",
-    "fusion",
-    "fusion_head_epoch5_acc0.43.pt"
-)
+IMAGE_PT_PATH  = MODEL_DIR / "image_model.pt"
+TEXT_PT_PATH   = MODEL_DIR / "text_model.pt"
+AUDIO_PT_PATH  = MODEL_DIR / "audio_model.pt"
+FUSION_PT_PATH = MODEL_DIR / "fusion_head.pt"   # 파일명에 맞게 수정
