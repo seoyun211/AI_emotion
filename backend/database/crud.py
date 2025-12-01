@@ -1,15 +1,24 @@
-from typing import Dict
+from typing import Dict, List, Optional
 from datetime import datetime
 from database.session import get_db_connection
 import asyncio
 import bcrypt
 
+# =========================================================================
+# 1. 인증/비밀번호 관련 함수
+# =========================================================================
+
+# TODO: hash_password 구현 필요
 def hash_password(password: str) -> str:
-    pass
+    """비밀번호를 해시합니다. (실제 구현 필요)"""
+    if not password:
+        raise ValueError("비밀번호는 비워둘 수 없습니다.")
+    # 실제 bcrypt 해싱 로직을 여기에 구현해야 합니다.
+    # 예시: return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return "DUMMY_HASHED_PASSWORD" # 임시 더미 값
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """평문 비밀번호와 해시된 비밀번호를 비교합니다."""
-    # (내용은 그대로 유지)
     try:
         return bcrypt.checkpw(
             plain_password.encode('utf-8'), 
@@ -18,10 +27,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except ValueError:
         return False
 
+# =========================================================================
+# 2. 사용자 관리 (UserCRUD)
+# =========================================================================
+
 class UserCRUD:
     @staticmethod
     def create_user(user_data: Dict):
-
+        """새로운 사용자를 DB에 생성합니다."""
         print("--- [DEBUG] create_user 함수 시작 ---", flush=True)
 
         connection = get_db_connection()
@@ -30,8 +43,8 @@ class UserCRUD:
         
         password_hash_value = user_data.get('password_hash')
         if not password_hash_value:
-             raise ValueError("해시된 비밀번호 정보가 누락되었습니다.")
-                
+            raise ValueError("해시된 비밀번호 정보가 누락되었습니다.")
+        
         sql = """
             INSERT INTO User (username, password_hash, role, gender, birth_date, address, user_phone)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -51,7 +64,7 @@ class UserCRUD:
             with connection.cursor() as cursor:
                 cursor.execute(sql, params)
             connection.commit()
-            return cursor.lastrowid 
+            return cursor.lastrowid # 새로 생성된 user_id 반환
         except Exception as e:
             connection.rollback()
             print(f"--- [ERROR] User 생성 중 오류: {e} ---", flush=True)
@@ -69,19 +82,72 @@ class UserCRUD:
         try:
             with connection.cursor() as cursor:
                 cursor.execute(sql, (user_phone,))
-                return cursor.fetchone()
+                # cursor.fetchone()은 딕셔너리를 반환한다고 가정합니다.
+                return cursor.fetchone() 
         except Exception:
             return None
+        
+    def get_user_by_id(user_id: int) -> dict | None:
+        """user_id를 사용하여 DB에서 사용자 정보를 조회합니다."""
+        connection = get_db_connection()
+        if not connection:
+            return None
+        
+        # password_hash를 제외하고 UserResponse에 필요한 필드만 조회합니다.
+        sql = "SELECT user_id, username, role, gender, birth_date, address, user_phone, guardian_name, guardian_phone FROM User WHERE user_id = %s"
+    
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (user_id,))
+                return cursor.fetchone() 
+        except Exception:
+            return None
+        
+    @staticmethod
+    def delete_user_by_id(user_id: int):
+        """특정 user_id를 가진 사용자를 DB에서 삭제합니다 (롤백용)."""
+        connection = get_db_connection()
+        if not connection:
+            raise Exception("DB 연결 실패")
+            
+        sql_disable_fk = "SET FOREIGN_KEY_CHECKS = 0;"
+        sql_delete = "DELETE FROM User WHERE user_id = %s"
+        sql_enable_fk = "SET FOREIGN_KEY_CHECKS = 1;"
+        
+        try:
+            with connection.cursor() as cursor:
+                # 1. 외래 키 검사 비활성화
+                cursor.execute(sql_disable_fk) 
+                
+                # 2. 삭제 실행
+                cursor.execute(sql_delete, (user_id,))
+                
+                # 3. 외래 키 검사 활성화
+                cursor.execute(sql_enable_fk)
+                
+            connection.commit()
+        except Exception as e:
+            connection.rollback()
+            # 롤백 후에도 외래 키 검사를 다시 켜야 합니다.
+            # 커넥션 레벨이므로 다시 활성화하는 코드를 추가하는 것이 안전합니다.
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute(sql_enable_fk)
+            except:
+                pass 
+            raise e
+
+# =========================================================================
+# 3. 분석 청크 관리 (AnalysisChunkCRUD)
+# =========================================================================
 
 class AnalysisChunkCRUD:
-    # EmotionLogCRUD 대신 AnalysisChunk 테이블을 사용하도록 이름 변경 및 구현
     @staticmethod
     def create_analysis_chunk(chunk_data: Dict):
         connection = get_db_connection()
         if not connection:
             raise Exception("DB 연결 실패")
         
-        # SQL: AnalysisChunk 테이블의 칼럼명과 순서를 정확히 일치시킵니다.
         sql = """
             INSERT INTO AnalysisChunk (session_id, user_id, analysis_id, analysis_time, text_result, audio_result, face_result, final_result)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -89,8 +155,8 @@ class AnalysisChunkCRUD:
         
         params = (
             chunk_data['session_id'],
-            chunk_data['user_id'],   
-            chunk_data['analysis_id'],  
+            chunk_data['user_id'], 
+            chunk_data['analysis_id'], 
             datetime.now(), 
             chunk_data.get('text_result'),
             chunk_data.get('audio_result'),
@@ -107,7 +173,11 @@ class AnalysisChunkCRUD:
             connection.rollback()
             print(f"Chunk 생성 중 오류: {e}")
             raise e
-        
+            
+# =========================================================================
+# 4. 보호자 관계 관리 (GuardianCRUD)
+# =========================================================================
+
 class GuardianCRUD:
     """보호자-피보호자 관계(GuardianRelationship) 관리 클래스"""
     
@@ -135,6 +205,53 @@ class GuardianCRUD:
             raise e
 
     @staticmethod
+    def create_relationship_with_validation(
+        new_user_id: int, 
+        new_user_role: str, 
+        linked_phone_input: Optional[str]
+    ):
+        """
+        사용자의 역할에 따라 상대방을 조회하고 관계를 생성하며 유효성 검사를 수행합니다.
+        회원가입 시 linked_phone_input이 없는 경우 (None) 관계 생성 로직을 건너뜁니다.
+        """
+        if not linked_phone_input:
+            print("--- [DEBUG] 연결할 전화번호가 없어 관계 생성을 건너뜁니다. ---")
+            return None # 관계 생성 로직 건너뛰기
+
+        # A. 상대방 정보 조회 (user_id, role 포함)
+        linked_user_data = UserCRUD.get_user_by_phone(linked_phone_input)
+
+        if linked_user_data is None:
+            raise ValueError("연결하려는 상대방의 전화번호가 등록되어 있지 않습니다.")
+        
+        linked_user_id = linked_user_data['user_id']
+        linked_user_role = linked_user_data['role']
+        
+        # B. 역할 유효성 검사
+        if new_user_role == 'guardian' and linked_user_role != 'ward':
+            raise ValueError("보호자는 피보호자(ward)하고만 연결할 수 있습니다.")
+        if new_user_role == 'ward' and linked_user_role != 'guardian':
+            raise ValueError("피보호자는 보호자(guardian)하고만 연결할 수 있습니다.")
+
+        # C. GuardianRelationship에 삽입할 ID 결정
+        if new_user_role == 'guardian':
+            guardian_id = new_user_id
+            ward_id = linked_user_id
+        else: # new_user_role == 'ward'
+            guardian_id = linked_user_id
+            ward_id = new_user_id
+            
+        # D. 관계 생성
+        try:
+            return GuardianCRUD.create_relationship(guardian_id, ward_id)
+        except Exception as e:
+            # DB의 UNIQUE KEY 제약 조건 위반(중복 관계) 등의 오류를 사용자 친화적으로 처리
+            if "Duplicate entry" in str(e):
+                raise ValueError("이미 등록된 보호자-피보호자 관계입니다.")
+            raise ValueError(f"관계 생성 실패: {str(e)}")
+
+
+    @staticmethod
     def get_wards_by_guardian_id(guardian_id: int) -> list[Dict]:
         """특정 보호자가 관리하는 모든 피보호자의 user_id와 username을 조회합니다."""
         connection = get_db_connection()
@@ -155,10 +272,14 @@ class GuardianCRUD:
             with connection.cursor() as cursor:
                 cursor.execute(sql, (guardian_id,))
                 return cursor.fetchall()
-            
+                
         except Exception:
             return []
-        
+            
+# =========================================================================
+# 5. 알림 관리 (AlertCRUD)
+# =========================================================================
+
 class AlertCRUD:
     @staticmethod
     async def get_alerts_by_guardian_id(guardian_id: int):
