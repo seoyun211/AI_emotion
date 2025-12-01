@@ -60,11 +60,13 @@ class SignUpRequest(BaseModel):
     username: str
     password: str
     gender: str
+    role: str
     birth_date: date
     address: Optional[str] = None
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
     user_phone: str
+    
 
 
 class TokenResponse(BaseModel):
@@ -72,6 +74,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     username: str
+    role: str
 
 
 # -------------------------
