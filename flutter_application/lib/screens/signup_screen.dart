@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 const String baseUrl = 'http://localhost:8000';
 
@@ -25,6 +26,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _wardPhoneController = TextEditingController(); // 어르신 전화번호 (보호자용)
   
   String? _selectedRole; // 'ward' (어르신) or 'guardian' (보호자)
   String? _selectedGender; // 'M' or 'F'
@@ -37,6 +39,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _wardPhoneController.dispose();
     super.dispose();
   }
 
@@ -46,6 +49,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       initialDate: DateTime(1960),
       firstDate: DateTime(1920),
       lastDate: DateTime.now(),
+      locale: const Locale('ko', 'KR'),
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -64,6 +68,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         _selectedBirthDate = picked;
       });
     }
+  }
+
+  String _formatDateKorean(DateTime date) {
+    return '${date.year}년 ${date.month}월 ${date.day}일';
   }
 
   Future<void> _handleSignUp() async {
@@ -90,6 +98,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    // 보호자인 경우 어르신 전화번호 확인
+    if (_selectedRole == 'guardian' && _wardPhoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('어르신 전화번호를 입력해주세요')),
+      );
+      return;
+    }
+
     // API 호출
     final signupData = {
       'username': _usernameController.text,
@@ -99,6 +115,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       'gender': _selectedGender,
       'birth_date': _selectedBirthDate!.toIso8601String().split('T')[0],
       'address': _addressController.text,
+      if (_selectedRole == 'guardian') 'ward_phone': _wardPhoneController.text,
     };
     
     print('회원가입 데이터: $signupData');
@@ -123,11 +140,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
             backgroundColor: _selectedRole == 'ward' 
                 ? const Color(0xFFFF9800) 
                 : const Color(0xFF66BB6A),
+            duration: const Duration(seconds: 2),
           ),
         );
         
-        // role 정보를 전달하면서 화면 전환
+        // role 정보를 전달
         widget.onSignUpSuccess(_selectedRole!);
+        
+        // 로그인 화면으로 돌아가기
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          Navigator.pop(context);
+        }
       } else {
         String message = '회원가입에 실패했습니다.';
         try {
@@ -267,6 +291,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
               const SizedBox(height: 16),
 
+              // 보호자 선택 시 어르신 전화번호 입력
+              if (_selectedRole == 'guardian') ...[
+                TextFormField(
+                  controller: _wardPhoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: '어르신 전화번호',
+                    prefixIcon: Icon(Icons.elderly, color: primaryColor),
+                    hintText: '010-1234-5678',
+                    helperText: '연동할 어르신의 전화번호를 입력해주세요',
+                    helperStyle: TextStyle(
+                      color: primaryColor.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: primaryColor, width: 2),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (_selectedRole == 'guardian' && (value == null || value.isEmpty)) {
+                      return '어르신 전화번호를 입력해주세요';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // 비밀번호
               TextFormField(
                 controller: _passwordController,
@@ -339,7 +395,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: Text(
                     _selectedBirthDate == null
                         ? '날짜를 선택하세요'
-                        : '${_selectedBirthDate!.year}-${_selectedBirthDate!.month.toString().padLeft(2, '0')}-${_selectedBirthDate!.day.toString().padLeft(2, '0')}',
+                        : _formatDateKorean(_selectedBirthDate!),
                     style: TextStyle(
                       color: _selectedBirthDate == null 
                           ? Colors.grey 

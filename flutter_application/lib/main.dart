@@ -1,5 +1,6 @@
 // main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // 추가
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -51,6 +52,18 @@ class MalDongApp extends StatelessWidget {
           title: '말동',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
+          
+          // 한글 로케일 설정 추가
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('ko', 'KR'),
+          ],
+          locale: const Locale('ko', 'KR'),
+          
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             return MediaQuery(
