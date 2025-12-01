@@ -19,6 +19,7 @@ import 'maldong_avatar.dart';
 
 // GLB 파일 경로
 const customAvatarUrl = 'assets/model.glb';
+
 // 앱 전체에서 쓸 카메라 리스트
 late List<CameraDescription> cameras;
 
@@ -51,7 +52,7 @@ class MalDongApp extends StatelessWidget {
           title: '말동',
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
-          
+
           // 한글 로케일 설정 추가
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
@@ -62,7 +63,7 @@ class MalDongApp extends StatelessWidget {
             Locale('ko', 'KR'),
           ],
           locale: const Locale('ko', 'KR'),
-          
+
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             return MediaQuery(
