@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     user_id: int
     username: str
     gender: str
+    role: str
     address: Optional[str] = None
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
@@ -66,6 +67,7 @@ class SignUpRequest(BaseModel):
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
     user_phone: str
+    linked_phone_input: Optional[str] = None
     
 
 
