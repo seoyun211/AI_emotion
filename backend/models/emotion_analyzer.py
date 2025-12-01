@@ -1,6 +1,9 @@
-# 🧠 기본 감정 분석
-def analyze_emotion(text: str) -> dict:
-    """텍스트 기반 감정 분석"""
+# models/emotion_analyzer.py (최종 단일 코드)
+from typing import Dict
+
+# 🧠 기본 감정 분석 (키워드 기반 Mock 로직 사용)
+def analyze_emotion(text: str) -> Dict:
+    """텍스트 기반 감정 분석 (Mock 키워드 분석)"""
     text_lower = text.lower()
     
     # 감정 키워드 분석
@@ -42,5 +45,6 @@ def analyze_emotion(text: str) -> dict:
         "emotion": emotion,
         "confidence": round(confidence, 3),
         "risk_score": round(risk_score, 3),
-        "needs_alert": needs_alert
+        "needs_alert": needs_alert,
+        "model": "basic"  # 🚨 emotion_service의 통합 로직을 위해 필수 추가
     }

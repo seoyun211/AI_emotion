@@ -247,4 +247,5 @@ def get_emotion_analyzer() -> EmotionAnalyzer:
     global _emotion_analyzer
     if _emotion_analyzer is None:
         _emotion_analyzer = EmotionAnalyzer()
+
     return _emotion_analyzer

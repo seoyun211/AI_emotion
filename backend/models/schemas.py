@@ -117,8 +117,7 @@ class AlertResponse(BaseModel):
 
 
 # -------------------------
-# 5. (예전 구조) 멀티모달 요청/응답 스키마
-# — 지금 너의 backend가 쓰던 원래 형태 그대로 복원
+# 5. 멀티모달 요청/응답 스키마
 # -------------------------
 class MultiModalEmotionRequest(BaseModel):
     user_id: Optional[int] = None
