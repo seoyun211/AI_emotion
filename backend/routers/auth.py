@@ -67,5 +67,6 @@ def login_for_access_token(form_data: LoginRequest):
         "access_token": access_token, 
         "token_type": "bearer",
         "user_id": user['user_id'],  
-        "username": user['username']
+        "username": user['username'],
+        "role": user['role']
         }

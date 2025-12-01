@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'home_screen.dart'; // 어르신 홈 화면
+import 'guardian/guardian_home_screen.dart'; // 보호자 홈 화면
+import '../maldong_avatar.dart'; // 아바타
 
 const String baseUrl = 'http://localhost:8000';
 
@@ -8,11 +12,11 @@ const String baseUrl = 'http://localhost:8000';
 // 로그인 화면
 // ============================================
 class LoginScreen extends StatefulWidget {
-  final Function(String role) onLoginSuccess;
+  final Function(String role)? onLoginSuccess;
 
   const LoginScreen({
     Key? key,
-    required this.onLoginSuccess,
+    this.onLoginSuccess,
   }) : super(key: key);
 
   @override
@@ -57,17 +61,76 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final role = data['role'];      // 'ward' or 'guardian'
         final username = data['username'] ?? '사용자';
+        final userId = data['user_id'];
+        final token = data['token'];
+
+        // SharedPreferences에 저장
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', token ?? '');
+        await prefs.setString('user_role', role);
+        await prefs.setInt('user_id', userId ?? 0);
+        await prefs.setString('username', username);
 
         // 3) 성공 알림
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('로그인 성공! $username님 환영합니다 🎉'),
             backgroundColor: const Color(0xFF66BB6A),
+            duration: const Duration(seconds: 2),
           ),
         );
 
-        // 4) role 정보를 전달하면서 화면 전환
-        widget.onLoginSuccess(role);
+        // 4) 콜백이 있으면 호출
+        if (widget.onLoginSuccess != null) {
+          widget.onLoginSuccess!(role);
+        }
+
+        // 5) 화면 전환
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
+          if (role == 'ward') {
+            // 어르신 홈 화면으로 이동
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  onStartCall: () {
+                    // 화상 통화 시작 로직
+                    print('화상 통화 시작');
+                  },
+                  avatar: const MaldongAvatar(url: 'assets/model.glb'),
+                  onOpenSettings: () {
+                    // 설정 열기 로직
+                    print('설정 열기');
+                  },
+                ),
+              ),
+            );
+          } else if (role == 'guardian') {
+            // 보호자 홈 화면으로 이동
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GuardianHomeScreen(
+                  onOpenSettings: () {
+                    // 설정 열기 로직
+                    print('설정 열기');
+                  },
+                  onLogout: () async {
+                    // 로그아웃 처리
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.clear();
+                    
+                    if (context.mounted) {
+                      Navigator.pushReplacementNamed(context, '/');
+                    }
+                  },
+                ),
+              ),
+            );
+          }
+        }
       } else {
         // 5) 200 아니면 에러 처리
         String message = '로그인에 실패했습니다.';
