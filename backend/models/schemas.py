@@ -68,6 +68,7 @@ class SignUpRequest(BaseModel):
     guardian_phone: Optional[str] = None
     user_phone: str
     linked_phone_input: Optional[str] = None
+    ward_phone: Optional[str] = None
     
 
 
