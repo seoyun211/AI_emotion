@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from fastapi import HTTPException, status
-# config 파일과 JWT_CONFIG는 import 되어 있다고 가정합니다.
 from config import JWT_CONFIG
 from typing import Dict, Optional
 # UserCRUD, GuardianCRUD, delete_user_by_id 함수 import
@@ -35,9 +34,11 @@ def create_new_user(user_data: SignUpRequest) -> Dict:
     db_data.pop('password', None)
     db_data['password_hash'] = hashed_password
 
-    # linked_phone_input은 DB의 User 테이블에 저장하지 않으므로 pop으로 추출
-    linked_phone_input = db_data.pop('linked_phone_input', None)
+    ward_phone = db_data.pop('ward_phone', None)
 
+    if db_data['role'] == 'guardian' and not ward_phone:
+        raise ValueError("보호자 계정은 연결할 피보호자의 전화번호를 반드시 입력해야 합니다.")
+    
     logger.debug(f"최종 DB 데이터 키 확인: {db_data.keys()}")
 
     # 3. User 테이블에 사용자 생성 (commit 발생)
@@ -49,27 +50,26 @@ def create_new_user(user_data: SignUpRequest) -> Dict:
         raise ValueError(f"회원가입 처리 실패: {str(e)}")
     
     # 4. 보호자-피보호자 관계 설정 및 실패 시 보상(삭제) 로직 
-    if linked_phone_input:
+    if ward_phone:
         try:
             GuardianCRUD.create_relationship_with_validation(
                 new_user_id=new_user_id,
                 new_user_role=db_data['role'], 
-                linked_phone_input=linked_phone_input
+                linked_phone_input=ward_phone # ward_phone을 linked_phone_input 인자로 전달
             )
             logger.info(f"관계 생성 성공: User ID {new_user_id} 연결됨")
             
         except ValueError as e:
-            logger.error(f"관계 설정 실패 감지. 롤백 시작. 오류: {e}")
+            # 🚨 관계 설정 실패 시, 보상 로직: 방금 생성된 사용자 삭제(롤백) 🚨
             try:
-                logger.debug(f"삭제 시도 ID: {new_user_id}")
                 UserCRUD.delete_user_by_id(new_user_id) 
                 logger.warning(f"관계 설정 실패로 인해 User ID {new_user_id} 삭제(롤백) 완료.")
             except Exception as delete_e:
                 logger.error(f"보상 롤백 실패: User ID {new_user_id} 삭제 중 오류: {delete_e}")
                 # 이 경우 DB에 남은 데이터를 수동으로 정리해야 합니다.
 
-            # 실패 메시지를 클라이언트에게 전달 (라우터에서 400 처리)
-            raise ValueError(f"관계 설정 실패로 회원가입 취소됨: {str(e)}")
+            # 클라이언트에게 실패 메시지 전달
+            raise ValueError(f"관계 설정 실패로 회원가입 취소됨 어르신 번호를 확인해주세요.: {str(e)}")
 
     # 5. 응답 형태로 사용자 ID와 역할 반환
     return {
