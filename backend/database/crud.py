@@ -46,8 +46,9 @@ class UserCRUD:
             raise ValueError("해시된 비밀번호 정보가 누락되었습니다.")
         
         sql = """
-            INSERT INTO User (username, password_hash, role, gender, birth_date, address, user_phone)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO User (username, password_hash, role, gender, birth_date, address, user_phone, 
+                              guardian_name, guardian_phone)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         params = (
@@ -57,7 +58,9 @@ class UserCRUD:
             user_data['gender'],
             user_data['birth_date'],
             user_data.get('address'),
-            user_data['user_phone']
+            user_data['user_phone'],
+            user_data.get('guardian_name'),  
+            user_data.get('guardian_phone')
         )
         
         try:
@@ -111,69 +114,44 @@ class UserCRUD:
             raise Exception("DB 연결 실패")
             
         sql_disable_fk = "SET FOREIGN_KEY_CHECKS = 0;"
-        sql_delete = "DELETE FROM User WHERE user_id = %s"
         sql_enable_fk = "SET FOREIGN_KEY_CHECKS = 1;"
         
+        sql_delete_relationship = "DELETE FROM GuardianRelationship WHERE guardian_user_id = %s OR ward_user_id = %s"
+        sql_delete_alerts = "DELETE FROM Alert WHERE user_id = %s"
+        sql_delete_chunks = "DELETE FROM AnalysisChunk WHERE user_id = %s"
+        sql_delete_sessions = "DELETE FROM Session WHERE user_id = %s"
+
+        sql_delete_user = "DELETE FROM User WHERE user_id = %s"
+
         try:
             with connection.cursor() as cursor:
-                # 1. 외래 키 검사 비활성화
+                # 1. 외래 키 검사 잠시 비활성화 (보험)
                 cursor.execute(sql_disable_fk) 
                 
-                # 2. 삭제 실행
-                cursor.execute(sql_delete, (user_id,))
+                # 2. 자식 레코드 먼저 삭제
+                cursor.execute(sql_delete_relationship, (user_id, user_id))
+                cursor.execute(sql_delete_alerts, (user_id,))
+                cursor.execute(sql_delete_chunks, (user_id,))
+                cursor.execute(sql_delete_sessions, (user_id,))
                 
-                # 3. 외래 키 검사 활성화
+                # 3. 부모 레코드 (User) 삭제
+                cursor.execute(sql_delete_user, (user_id,))
+                
+                # 4. 외래 키 검사 활성화
                 cursor.execute(sql_enable_fk)
                 
             connection.commit()
+            
         except Exception as e:
             connection.rollback()
             # 롤백 후에도 외래 키 검사를 다시 켜야 합니다.
-            # 커넥션 레벨이므로 다시 활성화하는 코드를 추가하는 것이 안전합니다.
             try:
                 with connection.cursor() as cursor:
                     cursor.execute(sql_enable_fk)
             except:
                 pass 
             raise e
-
-# =========================================================================
-# 3. 분석 청크 관리 (AnalysisChunkCRUD)
-# =========================================================================
-
-class AnalysisChunkCRUD:
-    @staticmethod
-    def create_analysis_chunk(chunk_data: Dict):
-        connection = get_db_connection()
-        if not connection:
-            raise Exception("DB 연결 실패")
         
-        sql = """
-            INSERT INTO AnalysisChunk (session_id, user_id, analysis_id, analysis_time, text_result, audio_result, face_result, final_result)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        params = (
-            chunk_data['session_id'],
-            chunk_data['user_id'], 
-            chunk_data['analysis_id'], 
-            datetime.now(), 
-            chunk_data.get('text_result'),
-            chunk_data.get('audio_result'),
-            chunk_data.get('face_result'),
-            chunk_data['final_result'],
-        )
-        
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, params)
-            connection.commit()
-            return cursor.lastrowid
-        except Exception as e:
-            connection.rollback()
-            print(f"Chunk 생성 중 오류: {e}")
-            raise e
-            
 # =========================================================================
 # 4. 보호자 관계 관리 (GuardianCRUD)
 # =========================================================================
