@@ -40,22 +40,22 @@ AI_emotion은 텍스트, 음성, 이미지 데이터를 분석하여 사용자�
 
 ```mermaid
 graph TD
-    A[Flutter App] -->|음성/이미지/텍스트 요청| B[FastAPI Server]
+    A[Flutter App] -->|음성·이미지·텍스트 요청| B[FastAPI Server]
 
     %% 개별 감정 모델
-    B --> C[Text Emotion Model (KoBERT)]
-    B --> D[Voice Emotion Model (Audio CNN-BiLSTM)]
-    B --> E[Image Emotion Model (EfficientNet)]
+    B --> C[Text Emotion Model - KoBERT]
+    B --> D[Voice Emotion Model - Audio CNN-BiLSTM]
+    B --> E[Image Emotion Model - EfficientNet]
 
-    %% 모델 출력: 감정 확률 벡터 (4-class)
-    C --> G[Ensemble Engine<br/>확률 가중 합산]
+    %% 모델 출력: 감정 확률 벡터 (4 class)
+    C --> G[Ensemble Engine - weighted sum]
     D --> G
     E --> G
 
     %% 최종 감정 및 후처리
-    G --> H[LLM 응답 생성]
-    H --> I[TTS 음성 합성]
-    G --> J[위험도 평가 & 알림 로직]
+    G --> H[LLM Response]
+    H --> I[TTS Synthesis]
+    G --> J[Risk Evaluation & Guardian Alert]
 
     %% 앱으로 응답
     I -->|응답 음성 + 감정 결과| A
