@@ -15,7 +15,6 @@ test_images/
 cache/
 
 #모델
-models/
 *.pt
 yolov8n.pt
 .DS_Store
