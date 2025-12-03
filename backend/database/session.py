@@ -1,9 +1,8 @@
-# C:\Users\user\Desktop\AI_emotion\backend\database\session.py 파일 수정
+# C:\Users\jiheo\AI_emotion\backend\database\session.py
 
 from config import DATABASE_CONFIG
 import pymysql.cursors
-import time  # time 모듈 임포트 (디버깅용)
-
+import time
 
 # -------------------------
 ## 💾 DB 연결 관리
@@ -11,7 +10,12 @@ import time  # time 모듈 임포트 (디버깅용)
 db_connection = None
 
 def get_db_connection():
-    """DB 연결을 생성하고 반환합니다."""
+    """
+    DB 연결을 생성하고 반환합니다.
+    
+    Returns:
+        pymysql.connections.Connection: PyMySQL 연결 객체
+    """
     global db_connection
     
     # 🚨 DB 연결 시도 타임아웃 설정 (5초) 
@@ -20,7 +24,6 @@ def get_db_connection():
     # 연결이 없거나 닫혀있으면 새로 연결 시도
     if db_connection is None or not db_connection.open:
         try:
-            # 💡 1. DB 연결 전에 현재 시간을 출력하여 얼마나 걸리는지 확인
             print(f"[{time.strftime('%H:%M:%S')}] ⏳ MySQL DB 연결 시도 중...")
             
             db_connection = pymysql.connect(
@@ -28,18 +31,31 @@ def get_db_connection():
                 user=DATABASE_CONFIG['user'],
                 password=DATABASE_CONFIG['password'],
                 database=DATABASE_CONFIG['database'],
+                # ✅ DictCursor 사용 (auth.py와 호환)
                 cursorclass=pymysql.cursors.DictCursor,
-                # ⭐️ 핵심 수정: 타임아웃을 5초로 설정합니다.
-                connect_timeout=CONNECT_TIMEOUT 
+                connect_timeout=CONNECT_TIMEOUT,
+                charset='utf8mb4',
+                autocommit=False  # 트랜잭션 제어
             )
             print("✅ MySQL DB 연결 성공!")
+            
         except pymysql.err.OperationalError as e:
-            # 타임아웃이나 접근 오류 등 연결 관련 오류를 구체적으로 잡습니다.
             print(f"❌ MySQL DB 연결 실패 (OperationalError): {e}")
             db_connection = None
+            raise  # 에러를 다시 발생시켜 호출자가 처리하도록
+            
         except Exception as e:
-            # 그 외의 일반 오류
             print(f"❌ MySQL DB 연결 실패 (기타 오류): {e}")
             db_connection = None
+            raise
             
     return db_connection
+
+
+def close_db_connection():
+    """DB 연결을 명시적으로 종료합니다."""
+    global db_connection
+    if db_connection and db_connection.open:
+        db_connection.close()
+        print("🔌 MySQL DB 연결 종료")
+        db_connection = None
