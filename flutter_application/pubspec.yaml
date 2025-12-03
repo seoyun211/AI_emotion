@@ -4,6 +4,10 @@ publish_to: 'none'
 
 version: 1.0.0+1
 
+dependencies:
+  http: ^1.2.0
+  audioplayers: ^5.2.0
+
 environment:
   sdk: ^3.5.4
 
