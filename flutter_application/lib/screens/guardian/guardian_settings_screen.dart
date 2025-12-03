@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import 'guardian_home_screen.dart';
-import 'guardian_analysis_screen.dart'; // ✅ 분석 화면 import 추가
+import 'guardian_analysis_screen.dart';
 
 class GuardianSettingsScreen extends StatefulWidget {
   final VoidCallback onBack;
   final VoidCallback onLogout;
+  final int guardianUserId;      // ✅ 추가
+  final String accessToken;      // ✅ 추가
 
   const GuardianSettingsScreen({
     super.key,
     required this.onBack,
     required this.onLogout,
+    required this.guardianUserId,    // ✅ 추가
+    required this.accessToken,       // ✅ 추가
   });
 
   @override
@@ -756,7 +759,7 @@ class _GuardianSettingsScreenState extends State<GuardianSettingsScreen> {
     );
   }
 
-  // ✅ 하단 네비게이션 바 추가
+  // ✅ 하단 네비게이션 바 (수정됨)
   Widget _buildBottomNavigation() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -780,25 +783,8 @@ class _GuardianSettingsScreenState extends State<GuardianSettingsScreen> {
             isSelected: _selectedIndex == 0,
             onTap: () {
               setState(() => _selectedIndex = 0);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (homeContext) => GuardianHomeScreen(
-                    onOpenSettings: () {
-                      Navigator.push(
-                        homeContext,
-                        MaterialPageRoute(
-                          builder: (settingsContext) => GuardianSettingsScreen(
-                            onBack: () => Navigator.pop(settingsContext),
-                            onLogout: widget.onLogout,
-                          ),
-                        ),
-                      );
-                    },
-                    onLogout: widget.onLogout,
-                  ),
-                ),
-              );
+              // ✅ Navigator.pop으로 이전 화면(GuardianHomeScreen)으로 돌아가기
+              Navigator.pop(context);
             },
           ),
           // 상세 분석
@@ -811,7 +797,10 @@ class _GuardianSettingsScreenState extends State<GuardianSettingsScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const GuardianAnalysisScreen(),
+                  builder: (context) =>  GuardianAnalysisScreen(
+                    guardianUserId: widget.guardianUserId,        
+                    accessToken: widget.accessToken, 
+                  ),
                 ),
               );
             },
