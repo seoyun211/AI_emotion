@@ -1,17 +1,15 @@
 # backend/services/emotion_service.py
 
 import uuid
-import shutil
+import asyncio
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from pathlib import Path
 
 from fastapi import HTTPException
 
 from models.emotion_analyzer import analyze_multimodal_emotion
-from models.schemas import MultiModalEmotionResponse
 from database.session import get_db_connection
-
 
 TEMP_DIR = Path("temp_uploads")
 TEMP_DIR.mkdir(exist_ok=True, parents=True)
@@ -22,25 +20,20 @@ class EmotionService:
     @staticmethod
     async def analyze_multimodal_emotion(
         text: Optional[str],
-        image_bytes: Optional[bytes],
+        image_frames: Optional[List[bytes]],   # 🔥 프레임 리스트로 변경
         audio_bytes: Optional[bytes],
         user_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        이미지/음성은 바이트 → 임시 파일 저장 후
-        앙상블파이프라인(analyze_multimodal_emotion) 호출.
+        이미지 프레임 리스트와 음성 bytes를 받아
+        1) 음성만 임시 wav 파일로 저장하고
+        2) 앙상블 파이프라인(analyze_multimodal_emotion)을 호출한다.
         """
 
-        # 1) 이미지/오디오 임시 저장
-        image_path = None
         audio_path = None
 
+        # 1) 오디오 임시 저장
         try:
-            if image_bytes:
-                image_path = TEMP_DIR / f"{uuid.uuid4()}_image.jpg"
-                with image_path.open("wb") as f:
-                    f.write(image_bytes)
-
             if audio_bytes:
                 audio_path = TEMP_DIR / f"{uuid.uuid4()}_audio.wav"
                 with audio_path.open("wb") as f:
@@ -52,18 +45,16 @@ class EmotionService:
         # 2) 앙상블 모델 호출
         try:
             result = analyze_multimodal_emotion(
-                image_path=str(image_path) if image_path else None,
+                image_frames=image_frames,
                 text=text,
                 wav_path=str(audio_path) if audio_path else None,
             )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"감정 분석 실패: {e}")
-
-        # 3) 임시파일 정리 (성공/실패와 무관하게)
-        if image_path and image_path.exists():
-            image_path.unlink()
-        if audio_path and audio_path.exists():
-            audio_path.unlink()
+        finally:
+            # 3) 임시 오디오 파일 정리
+            if audio_path and audio_path.exists():
+                audio_path.unlink()
 
         return result
 
@@ -123,27 +114,26 @@ def save_analysis_chunk(
 async def process_emotion_analysis(
     text: str,
     user_id: Optional[int] = None,
-    image_bytes: Optional[bytes] = None,
+    image_frames: Optional[List[bytes]] = None,  # 🔥 프레임 리스트
     audio_bytes: Optional[bytes] = None,
 ) -> Dict[str, Any]:
 
     # 1) 앙상블 분석 실행
     analysis_result = await emotion_service.analyze_multimodal_emotion(
         text=text,
-        image_bytes=image_bytes,
+        image_frames=image_frames,    # 🔥 여기서 image_frames 넘김
         audio_bytes=audio_bytes,
         user_id=user_id,
     )
 
-    # analysis_result는 ↓ 이런 형태
+    # analysis_result 예:
     # {
     #   "final": {...},
     #   "per_modality": {...}
     # }
-
     final = analysis_result["final"]
     emotion_label = final["label"]
-    confidence = final["probabilities"][emotion_label]
+    confidence = float(final["probabilities"][emotion_label])
     risk_score = confidence * (1.3 if final["id"] in (2, 3) else 1.0)
 
     analysis_id = str(uuid.uuid4())

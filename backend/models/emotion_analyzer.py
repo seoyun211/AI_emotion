@@ -1,11 +1,10 @@
 # backend/models/emotion_analyzer.py
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-import os
+from typing import Any, Dict, Optional, List
 
 from .ensemble_model import EnsembleEmotionModel
-from .clients.face_client import predict_face_probs
+from .clients.face_client import predict_face_probs_from_frames
 from .clients.voice_client import predict_voice_probs
 from .clients.text_client import predict_text_probs
 
@@ -19,29 +18,34 @@ ensemble_model = EnsembleEmotionModel(
 
 
 def _default_probs() -> list[float]:
-    """입력 모달이 없을 때 사용할 균일 분포 확률"""
+    """입력 모달이 없거나 오류가 날 때 사용할 균일 분포 확률"""
     return [0.25, 0.25, 0.25, 0.25]
 
 
 def analyze_multimodal_emotion(
-    image_path: Optional[str],
+    image_frames: Optional[List[bytes]],
     text: Optional[str],
     wav_path: Optional[str],
 ) -> Dict[str, Any]:
     """
-    이미지 / 텍스트 / 음성 입력을 받아
+    이미지(프레임 여러 장) / 텍스트 / 음성 입력을 받아
     세 단일 모델의 확률을 계산하고,
     앙상블 결과를 반환한다.
 
-    각 입력이 None이면 → 균일 분포 확률 사용.
+    - image_frames: 프레임 bytes 리스트 (보통 5장)
+    - text       : STT 결과 텍스트
+    - wav_path   : 로컬 wav 파일 경로
+
+    각 입력이 None이거나 오류가 나면 → 균일 분포 확률 사용.
     """
 
     # ---------------------------
-    # 1) 이미지 확률
+    # 1) 이미지 확률 (프레임 여러 개)
     # ---------------------------
-    if image_path and os.path.exists(image_path):
+    if image_frames and len(image_frames) > 0:
         try:
-            p_img = predict_face_probs(image_path)
+            # 프레임이 너무 많으면 앞에서 몇 개만 사용 (face_client 안에서 5장으로 잘라줘도 됨)
+            p_img = predict_face_probs_from_frames(image_frames)
         except Exception:
             p_img = _default_probs()
     else:
@@ -61,7 +65,7 @@ def analyze_multimodal_emotion(
     # ---------------------------
     # 3) 음성 확률
     # ---------------------------
-    if wav_path and os.path.exists(wav_path):
+    if wav_path:
         try:
             p_audio = predict_voice_probs(wav_path)
         except Exception:
