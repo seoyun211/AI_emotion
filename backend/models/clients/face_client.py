@@ -1,31 +1,39 @@
-from typing import Dict, Optional
-import asyncio
-# 전부 임시
-class FaceClient:
-    """얼굴(표정) 감정 분석 모델의 최소 인터페이스"""
-    # 현재는 모델이 없으므로 비활성화
-    enabled = False 
+# models/clients/face_client.py
+import torch
+from torchvision import transforms
+from PIL import Image
+import os
 
-    def __init__(self):
-        print("💡 FaceClient 모델 인터페이스 로드 완료.")
-        # 여기에 실제 모델 로드 코드를 나중에 추가합니다.
+LABELS = ["기쁨", "분노", "불안", "슬픔"]
 
-    async def analyze_emotion(self, video_data: bytes, user_id: Optional[str] = None) -> Dict:
-        """[임시 로직] 실제 모델이 구현될 때까지 Mock 결과를 반환합니다."""
-        if not self.enabled:
-            return {"success": False, "model": "face_mock", "emotion": "N/A", "confidence": 0.0, "risk_score": 0.0}
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+WEIGHT_PATH = os.path.join(BASE_DIR, "model_weights", "image_model.pt")
 
-        await asyncio.sleep(0.01) 
-        
-        # 임시 Mock 결과
-        return {
-            "success": True,
-            "model": "face_mock",
-            "emotion": "기쁨",
-            "confidence": 0.9,
-            "risk_score": 0.1,
-            "needs_alert": False
-        }
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# 🚨 emotion_service에서 임포트하기 위한 인스턴스 정의
-face_client = FaceClient()
+# TODO: 팀원이 만든 실제 이미지 모델 클래스로 교체
+from .some_image_model_def import ImageEmotionModel  # 예시
+
+_image_model = ImageEmotionModel(num_classes=4)
+_image_model.load_state_dict(torch.load(WEIGHT_PATH, map_location=device))
+_image_model.to(device)
+_image_model.eval()
+
+_img_transform = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.ToTensor(),
+    # Normalization 있으면 추가
+])
+
+def predict_face_probs(image_path: str) -> list[float]:
+    """
+    image_path: 로컬 이미지 파일 경로
+    return: [기쁨, 분노, 불안, 슬픔] 확률 리스트 (길이 4)
+    """
+    img = Image.open(image_path).convert("RGB")
+    x = _img_transform(img).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        logits = _image_model(x)
+        probs = torch.softmax(logits, dim=-1)[0].cpu().tolist()
+    return probs
