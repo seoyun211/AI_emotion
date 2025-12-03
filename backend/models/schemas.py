@@ -1,7 +1,7 @@
 # backend/models/schemas.py
 from pydantic import BaseModel
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 # -------------------------
 # A. 기본 입력 스키마 (Emotions, Dialogue 등에서 사용)
@@ -69,7 +69,6 @@ class SignUpRequest(BaseModel):
     user_phone: str
     linked_phone_input: Optional[str] = None
     ward_phone: Optional[str] = None
-    
 
 
 class TokenResponse(BaseModel):
@@ -132,9 +131,26 @@ class MultiModalEmotionRequest(BaseModel):
     image_base64: Optional[str] = None
 
 
+# ----- 6. 앙상블 상세 구조 (추가) ----- #
+class ModalityDetail(BaseModel):
+    """각 모달리티별(이미지/텍스트/음성) 감정 결과 상세"""
+    label: str               # "기쁨", "분노", "불안", "슬픔"
+    id: int                  # 0,1,2,3
+    probabilities: Dict[str, float]  # {"기쁨":0.7, "분노":0.1, ...}
+
+
+class EnsembleDetail(BaseModel):
+    """앙상블 최종 결과 + 모달리티별 결과"""
+    final: ModalityDetail
+    per_modality: Dict[str, ModalityDetail]  # {"image": {...}, "text": {...}, "audio": {...}}
+
+
 class MultiModalEmotionResponse(BaseModel):
-    emotion: str
-    confidence: float
+    emotion: str          # 최종 감정 라벨 (예: "기쁨")
+    confidence: float     # 최종 감정 확률 (예: 0.83)
     risk_score: float
     needs_alert: bool
     message: Optional[str] = None
+
+    # 🔥 새로 추가한 필드: 앙상블 상세 (필요할 때만 내려줘도 됨)
+    ensemble_detail: Optional[EnsembleDetail] = None
