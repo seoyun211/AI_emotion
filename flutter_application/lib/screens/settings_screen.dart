@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'font_size_screen.dart';
 import 'guardian_screen.dart';
 import 'profile_edit_screen.dart';
@@ -12,6 +13,87 @@ class SettingsScreen extends StatelessWidget {
     required this.onBack,
     required this.onLogout,
   });
+
+  Future<void> _handleLogout(BuildContext context) async {
+    // 확인 다이얼로그 표시
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          '로그아웃',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF5D4037),
+          ),
+        ),
+        content: const Text(
+          '정말 로그아웃 하시겠습니까?',
+          style: TextStyle(
+            fontSize: 16,
+            color: Color(0xFF8D6E63),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              '취소',
+              style: TextStyle(
+                color: Color(0xFF8D6E63),
+                fontSize: 16,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.red.withOpacity(0.1),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '로그아웃',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      // SharedPreferences에서 토큰 삭제
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('access_token');
+      await prefs.remove('user_role');
+      await prefs.remove('user_id');
+      
+      // 로그아웃 성공 메시지
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('로그아웃되었습니다'),
+            backgroundColor: Color(0xFFFF9800),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // 약간의 딜레이 후 로그아웃 콜백 실행
+        await Future.delayed(const Duration(milliseconds: 300));
+        onLogout();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +198,7 @@ class SettingsScreen extends StatelessWidget {
               
               // 로그아웃 버튼
               GestureDetector(
-                onTap: onLogout,
+                onTap: () => _handleLogout(context),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 18),

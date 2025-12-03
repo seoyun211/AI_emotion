@@ -9,36 +9,44 @@ router = APIRouter(prefix="/api/v1/auth", tags=["인증"])
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup_new_user(user_data: SignUpRequest):
     """
-    새로운 사용자(어르신 또는 보호자)를 등록합니다.
+    새로운 사용자(어르신 또는 보호자)를 등록하고, 관계 정보를 등록합니다.
     """
     try:
-        # 2. 새로운 사용자 생성 및 DB에 저장
-        # create_new_user 함수는 성공적으로 저장된 사용자 객체를 반환해야 합니다.
-        new_user_id = create_new_user(user_data)
+        # 2. 새로운 사용자 생성 및 DB에 저장 + 관계 설정
+        # create_new_user 함수는 성공 시 { "user_id": int, "role": str } 형태의 딕셔너리를 반환합니다.
+        result = create_new_user(user_data) 
         
         # 3. 성공 응답 (HTTP 201 Created)
         return UserResponse(
-            user_id=new_user_id, # DB에서 받은 ID 사용
+            user_id=result['user_id'],          # ✅ create_new_user 결과에서 ID 사용
             username=user_data.username,
             user_phone=user_data.user_phone,
-            # UserResponse에 필요한 나머지 필드들을 여기에 채워 넣어야 합니다.
+            
+            # 🌟 UserResponse에 role 필드를 채워 넣습니다.
+            role=result['role'],                # ✅ create_new_user 결과에서 Role 사용
+            
+            # UserResponse에 필요한 나머지 필드들을 여기에 채워 넣습니다.
             gender=user_data.gender,
             birth_date=user_data.birth_date,
             address=user_data.address,
-            message=f"사용자 등록 성공 (ID: {new_user_id})",
+            guardian_name=user_data.guardian_name,      # SignUpRequest에서 직접 가져옴
+            guardian_phone=user_data.guardian_phone,    # SignUpRequest에서 직접 가져옴
+            
+            message=f"사용자 등록 및 관계 설정 성공 (ID: {result['user_id']})",
             timestamp=datetime.now()
         )
     
     except ValueError as e:
-        # 예: 전화번호 형식 오류, DB 저장 실패 등 구체적인 오류 처리
+        # DB 제약 조건 위반 (전화번호 중복) 또는 관계 설정 실패 등의 구체적인 오류 처리
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    except Exception:
+    except Exception as e:
+        # 그 외 예기치 않은 오류
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User registration failed unexpectedly"
+            detail=f"User registration failed unexpectedly: {e}"
         )
 
 @router.post("/login", response_model=TokenResponse)
@@ -63,4 +71,10 @@ def login_for_access_token(form_data: LoginRequest):
     )
     
     # 3. 토큰 반환
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user_id": user['user_id'],
+        "username": user['username'],
+        "role": user['role']
+        }
