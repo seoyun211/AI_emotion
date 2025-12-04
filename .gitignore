@@ -15,11 +15,7 @@ test_images/
 cache/
 
 #모델
-models/
-<<<<<<< HEAD
-=======
 *.pt
->>>>>>> bff150c3597b1bd6ff4c7089c0cfb0a42fb41c46
 yolov8n.pt
 .DS_Store
 

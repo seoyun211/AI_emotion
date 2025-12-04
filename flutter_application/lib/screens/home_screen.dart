@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'call_history_screen.dart';
 import 'settings_screen.dart';
 import '../screens/video_call_screen.dart';
 import '../maldong_avatar.dart';
-import 'emotion_recode_screen.dart';
 
+const String baseUrl = 'http://localhost:8000';
 const customAvatarUrl = 'assets/model.glb';
 
 class HomeScreen extends StatefulWidget {
@@ -28,9 +31,127 @@ class _HomeScreenState extends State<HomeScreen> {
   String emotionLevel = '긍정';
   String userName = '사용자';
   int _selectedIndex = 0;
+  bool _isLoading = true;
+  int selectedMonth = DateTime.now().month;
+  
+  // ✅ 로그인 정보 저장
+  int? _userId;
+  String? _accessToken;
+  
+  // 월별 감정 데이터
+  final Map<int, EmotionData> monthlyData = {
+    1: EmotionData(positive: 12, normal: 8, negative: 6, serious: 5),
+    2: EmotionData(positive: 15, normal: 7, negative: 4, serious: 2),
+    3: EmotionData(positive: 18, normal: 6, negative: 4, serious: 3),
+    4: EmotionData(positive: 20, normal: 5, negative: 3, serious: 2),
+    5: EmotionData(positive: 16, normal: 8, negative: 4, serious: 2),
+    6: EmotionData(positive: 14, normal: 9, negative: 5, serious: 2),
+    7: EmotionData(positive: 17, normal: 7, negative: 4, serious: 2),
+    8: EmotionData(positive: 19, normal: 6, negative: 3, serious: 2),
+    9: EmotionData(positive: 15, normal: 8, negative: 5, serious: 2),
+    10: EmotionData(positive: 13, normal: 10, negative: 5, serious: 2),
+    11: EmotionData(positive: 16, normal: 8, negative: 4, serious: 2),
+    12: EmotionData(positive: 18, normal: 7, negative: 3, serious: 2),
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  // 사용자 정보와 오늘의 감정 데이터 로드
+  Future<void> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+      final token = prefs.getString('access_token');
+      final username = prefs.getString('username');
+
+      if (userId == null || token == null) {
+        throw Exception('로그인 정보가 없습니다');
+      }
+
+      // ✅ 로그인 정보 저장
+      setState(() {
+        _userId = userId;
+        _accessToken = token;
+        userName = username ?? '사용자';
+      });
+
+      // 2. 최근 감정 목록 가져오기 (limit=1로 가장 최근 것만)
+      final emotionUrl = Uri.parse('$baseUrl/api/v1/emotions/$userId/list?limit=1');
+      final emotionResponse = await http.get(
+        emotionUrl,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (emotionResponse.statusCode == 200) {
+        final data = jsonDecode(emotionResponse.body);
+        final emotions = data['emotions'] as List;
+        
+        if (emotions.isNotEmpty) {
+          final latestEmotion = emotions[0];
+          
+          setState(() {
+            currentEmotion = latestEmotion['emotion'] ?? '기쁨';
+            emotionLevel = _getEmotionLevelFromEmotion(currentEmotion);
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('데이터 로드 오류: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // 감정 이름으로 감정 레벨 추론
+  String _getEmotionLevelFromEmotion(String emotion) {
+    // 감정 매핑: 기쁨:0 당황:1 분노:2 불안:3 상처:4 슬픔:5 중립:6 역겨움:7 공포:8 놀람:9
+    
+    if (emotion == '기쁨' || emotion == '놀람') {
+      return '긍정';
+    } else if (emotion == '중립' || emotion == '당황') {
+      return '보통';
+    } else if (emotion == '불안' || emotion == '상처' || emotion == '슬픔') {
+      return '부정';
+    } else if (emotion == '분노' || emotion == '역겨움' || emotion == '공포') {
+      return '심각';
+    } else {
+      return '보통';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFFFF8F0),
+        body: const Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFFF9800),
+          ),
+        ),
+      );
+    }
+
+    final currentData = monthlyData[selectedMonth]!;
+    final total = currentData.total;
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8F0),
       body: SafeArea(
@@ -42,46 +163,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildEmotionBanner(),
                     const SizedBox(height: 40),
+                    
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
                         children: [
+                          // 말동이와 영상통화 버튼
                           _buildChatButton(),
-                          const SizedBox(height: 32),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _FeatureCard(
-                                  icon: Icons.history,
-                                  title: '통화기록',
-                                  color: const Color(0xFFFF9800),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const CallHistoryScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _FeatureCard(
-                                  icon: Icons.favorite,
-                                  title: '건강기록',
-                                  color: const Color(0xFFFFB74D),
-                                  onTap: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text('건강기록 화면')),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
+                          const SizedBox(height: 40),
+
+                          // 감정 기록 섹션
+                          _buildEmotionRecordSection(currentData, total),
                         ],
                       ),
                     ),
@@ -155,12 +247,15 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        Text(
-                          currentEmotion,
-                          style: TextStyle(
-                            fontSize: 28,
-                            color: emotionColor,
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            currentEmotion,
+                            style: TextStyle(
+                              fontSize: 28,
+                              color: emotionColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -195,17 +290,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildChatButton() {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoCallScreen(
-              onEndCall: () {
-                Navigator.pop(context);
-              },
-              avatar: MaldongAvatar(url: customAvatarUrl),
+        // ✅ userId와 accessToken이 있을 때만 이동
+        if (_userId != null && _accessToken != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoCallScreen(
+                onEndCall: () {
+                  Navigator.pop(context);
+                  _loadUserData();
+                },
+                avatar: MaldongAvatar(url: customAvatarUrl),
+                userId: _userId!,  // ✅ 추가
+                accessToken: _accessToken!,  // ✅ 추가
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          // 로그인 정보가 없는 경우
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('로그인 정보를 불러오는 중입니다...'),
+              backgroundColor: Color(0xFFFF9800),
+            ),
+          );
+        }
       },
       child: Container(
         width: double.infinity,
@@ -248,6 +357,246 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildEmotionRecordSection(EmotionData currentData, int total) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '이번 달 감정 기록',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF5D4037),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 월 선택
+        _buildMonthSelector(),
+        const SizedBox(height: 24),
+
+        // 가장 많은 감정
+        _buildTopEmotion(currentData),
+        const SizedBox(height: 24),
+
+        // 감정 카드들
+        _buildEmotionCard('긍정', currentData.positive, total, 
+          const Color(0xFF66BB6A), '😊'),
+        const SizedBox(height: 12),
+        _buildEmotionCard('보통', currentData.normal, total, 
+          const Color(0xFFFFB74D), '😐'),
+        const SizedBox(height: 12),
+        _buildEmotionCard('부정', currentData.negative, total, 
+          const Color(0xFF64B5F6), '😕'),
+        const SizedBox(height: 12),
+        _buildEmotionCard('심각', currentData.serious, total, 
+          const Color(0xFFEF5350), '😢'),
+      ],
+    );
+  }
+
+  Widget _buildMonthSelector() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () {
+              setState(() {
+                selectedMonth = selectedMonth > 1 ? selectedMonth - 1 : 12;
+              });
+            },
+            icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037), size: 28),
+          ),
+          Expanded(
+            child: Center(
+              child: Text(
+                '$selectedMonth월',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF5D4037),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              setState(() {
+                selectedMonth = selectedMonth < 12 ? selectedMonth + 1 : 1;
+              });
+            },
+            icon: const Icon(Icons.chevron_right, color: Color(0xFF5D4037), size: 28),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopEmotion(EmotionData data) {
+    String topEmotion;
+    int topCount;
+    Color topColor;
+    String emoji;
+
+    if (data.positive >= data.normal && 
+        data.positive >= data.negative && 
+        data.positive >= data.serious) {
+      topEmotion = '긍정';
+      topCount = data.positive;
+      topColor = const Color(0xFF66BB6A);
+      emoji = '😊';
+    } else if (data.normal >= data.negative && data.normal >= data.serious) {
+      topEmotion = '보통';
+      topCount = data.normal;
+      topColor = const Color(0xFFFFB74D);
+      emoji = '😐';
+    } else if (data.negative >= data.serious) {
+      topEmotion = '부정';
+      topCount = data.negative;
+      topColor = const Color(0xFF64B5F6);
+      emoji = '😕';
+    } else {
+      topEmotion = '심각';
+      topCount = data.serious;
+      topColor = const Color(0xFFEF5350);
+      emoji = '😢';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [topColor, topColor.withOpacity(0.8)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: topColor.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 48)),
+          const SizedBox(height: 12),
+          const Text(
+            '이번 달 가장 많은 기분',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            topEmotion,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            '$topCount번',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmotionCard(String label, int count, int total, Color color, String emoji) {
+    final percentage = total > 0 ? (count / total * 100).toInt() : 0;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(emoji, style: const TextStyle(fontSize: 32)),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text(
+                      '$count번',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF5D4037),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '($percentage%)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomNavigation() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -273,17 +622,34 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           _buildNavItem(
-            icon: Icons.insert_chart,
-            label: '감정기록',
+            icon: Icons.history,
+            label: '통화기록',
             isSelected: _selectedIndex == 1,
             onTap: () {
-              setState(() => _selectedIndex = 1);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmotionRecordScreen(),
-                ),
-              );
+              // ✅ userId와 accessToken이 있을 때만 이동
+              if (_userId != null && _accessToken != null) {
+                setState(() => _selectedIndex = 1);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CallHistoryScreen(
+                      userId: _userId!,
+                      accessToken: _accessToken!,
+                    ),
+                  ),
+                ).then((_) {
+                  // 돌아왔을 때 홈 탭으로 리셋
+                  setState(() => _selectedIndex = 0);
+                });
+              } else {
+                // 로그인 정보가 없는 경우
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('로그인 정보를 불러오는 중입니다...'),
+                    backgroundColor: Color(0xFFFF9800),
+                  ),
+                );
+              }
             },
           ),
           _buildNavItem(
@@ -296,15 +662,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => SettingsScreen(
-                    onBack: () {
-                      Navigator.pop(context);
-                    },
-                    onLogout: () {
-                      Navigator.pop(context);
-                    },
+                    onBack: () => Navigator.pop(context),
+                    onLogout: () => Navigator.pop(context),
                   ),
                 ),
-              );
+              ).then((_) {
+                // 돌아왔을 때 홈 탭으로 리셋
+                setState(() => _selectedIndex = 0);
+              });
             },
           ),
         ],
@@ -388,62 +753,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _FeatureCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color color;
-  final VoidCallback onTap;
+class EmotionData {
+  final int positive;
+  final int normal;
+  final int negative;
+  final int serious;
 
-  const _FeatureCard({
-    required this.icon,
-    required this.title,
-    required this.color,
-    required this.onTap,
+  EmotionData({
+    required this.positive,
+    required this.normal,
+    required this.negative,
+    required this.serious,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: color,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF5D4037),
-                ),
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              size: 20,
-              color: Colors.grey[400],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  int get total => positive + normal + negative + serious;
 }

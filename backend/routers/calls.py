@@ -1,7 +1,7 @@
 # routers/calls.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 from database.session import get_db_connection
@@ -21,17 +21,21 @@ class CallResponse(BaseModel):
     duration_seconds: Optional[int] = None
 
 
+class CallListResponse(BaseModel):
+    calls: List[CallResponse]
+
+
 @router.post("/start", response_model=CallResponse)
 def start_call(data: CallStartRequest):
     """
-    통화 시작 기록 (session 테이블)
+    통화 시작 기록 (Session 테이블)
     """
     conn = get_db_connection()
     try:
         now = datetime.now()
         with conn.cursor() as cur:
             sql = """
-            INSERT INTO `session` (user_id, start_time)
+            INSERT INTO `Session` (user_id, start_time)
             VALUES (%s, %s)
             """
             cur.execute(sql, (data.user_id, now))
@@ -64,9 +68,9 @@ def end_call(session_id: int):
             cur.execute(
                 """
                 SELECT user_id, start_time, end_time
-                FROM `session`
+                FROM `Session`
                 WHERE session_id = %s
-                """,
+                """,  # ✅ Session_id → session_id (컬럼명 소문자)
                 (session_id,),
             )
             row = cur.fetchone()
@@ -82,7 +86,7 @@ def end_call(session_id: int):
             duration = int((end_time - start_time).total_seconds())
 
             update_sql = """
-            UPDATE `session`
+            UPDATE `Session`
             SET end_time = %s, duration_seconds = %s
             WHERE session_id = %s
             """
@@ -98,9 +102,48 @@ def end_call(session_id: int):
         )
 
     except HTTPException:
+        # 위에서 이미 적절한 상태코드로 던진 것들은 그대로 다시 raise
         raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"통화 종료 기록 실패: {e}")
+    finally:
+        conn.close()
+
+
+@router.get("/user/{user_id}", response_model=CallListResponse)
+def get_call_history_by_user(user_id: int):
+    """
+    특정 유저의 통화 기록 전체 조회 (최근 순)
+    Flutter 통화기록 화면에서 사용하는 API
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            sql = """
+            SELECT session_id, user_id, start_time, end_time, duration_seconds
+            FROM `Session`
+            WHERE user_id = %s
+            ORDER BY start_time DESC
+            """
+            cur.execute(sql, (user_id,))
+            rows = cur.fetchall()
+
+        calls: List[CallResponse] = []
+        for row in rows:
+            calls.append(
+                CallResponse(
+                    session_id=row["session_id"],
+                    user_id=row["user_id"],
+                    start_time=row["start_time"],
+                    end_time=row["end_time"],
+                    duration_seconds=row["duration_seconds"],
+                )
+            )
+
+        return CallListResponse(calls=calls)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"통화 기록 조회 실패: {e}")
     finally:
         conn.close()

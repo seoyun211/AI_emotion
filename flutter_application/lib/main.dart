@@ -1,6 +1,6 @@
 // main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart'; // 추가
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -102,6 +102,11 @@ class _AppRootState extends State<AppRoot> {
   UserType? _userType;
   bool _isLoggedIn = false;
   bool _isInCall = false;
+  
+  // ✅ 로그인 정보 저장
+  int? _userId;
+  String? _accessToken;
+  String? _username;
 
   // 통합 회원가입 화면으로 이동
   void _goToSignUp() {
@@ -126,11 +131,22 @@ class _AppRootState extends State<AppRoot> {
     });
   }
 
-  // 로그인 성공 (role 정보를 받아서 홈 화면 결정)
-  void _handleLoginSuccess(String role) {
-    // role: 'ward' (어르신) 또는 'guardian' (보호자)
+  // ✅ 로그인 성공 (로그인 정보를 모두 받아서 저장)
+  void _handleLoginSuccess(Map<String, dynamic> loginData) {
+    // loginData: {
+    //   'user_id': int,
+    //   'access_token': String,
+    //   'role': String,
+    //   'username': String
+    // }
+    
+    final String role = loginData['role'];
+    
     setState(() {
       _isLoggedIn = true;
+      _userId = loginData['user_id'];
+      _accessToken = loginData['access_token'];
+      _username = loginData['username'];
       _userType = role == 'ward' ? UserType.elderly : UserType.guardian;
 
       if (_userType == UserType.elderly) {
@@ -175,6 +191,9 @@ class _AppRootState extends State<AppRoot> {
     setState(() {
       _isLoggedIn = false;
       _userType = null;
+      _userId = null;
+      _accessToken = null;
+      _username = null;
       _currentScreen = AppScreen.welcome;
     });
   }
@@ -206,15 +225,32 @@ class _AppRootState extends State<AppRoot> {
         );
 
       case AppScreen.guardianHome:
+        // ✅ 필수 파라미터 전달
+        if (_userId == null || _accessToken == null) {
+          // 로그인 정보가 없으면 로그인 화면으로
+          return LoginScreen(
+            onLoginSuccess: _handleLoginSuccess,
+          );
+        }
         return GuardianHomeScreen(
+          guardianUserId: _userId!,
+          accessToken: _accessToken!,
           onOpenSettings: _goToSettings,
           onLogout: _logout,
         );
 
       case AppScreen.videocall:
+        // ✅ 로그인 정보가 없으면 로그인 화면으로
+        if (_userId == null || _accessToken == null) {
+          return LoginScreen(
+            onLoginSuccess: _handleLoginSuccess,
+          );
+        }
         return VideoCallScreen(
           onEndCall: _endCall,
           avatar: MaldongAvatar(url: customAvatarUrl),
+          userId: _userId!,  // ✅ 추가
+          accessToken: _accessToken!,  // ✅ 추가
         );
 
       case AppScreen.settings:

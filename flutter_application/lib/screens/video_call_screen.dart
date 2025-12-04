@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:io'; // ★ 음성 파일 읽기용 (모바일/데스크톱용)
+import 'dart:typed_data'; // ★ 바이트 배열(Uint8List) 사용
+import 'dart:convert'; // ★ HTTP body 인코딩/디코딩
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,18 +10,29 @@ import 'package:camera/camera.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http; // ★ HTTP 요청
 
-import '../main.dart'; 
+import '../main.dart';
 import '../maldong_avatar.dart';
+import '../services/dialogue_service.dart'; // ★ /dialogue/speak + TTS 재생 함수
+
+// ★ 본인 환경에 맞게 수정 (에뮬레이터면 10.0.2.2, 실제 기기면 PC IP)
+const String baseUrl = 'http://localhost:8000';
 
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
   final Widget avatar;
 
+  // ★ 실제 유저 정보
+  final int userId;
+  final String accessToken;
+
   const VideoCallScreen({
     super.key,
     required this.onEndCall,
     required this.avatar,
+    required this.userId,
+    required this.accessToken,
   });
 
   @override
@@ -32,8 +46,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   CameraController? _cameraController;
   bool _isCameraOn = false;
 
+  // 🔥 카메라 에러 메시지 저장용
+  String? _cameraErrorMessage;
+
   final AudioRecorder _audioRecorder = AudioRecorder();
   String? _recordingPath;
+
+  // ★ 현재 사용 중인 카메라 인덱스 (0: 기본, 1: 다른 카메라)
+  int _currentCameraIndex = 0;
+
+  // ★ 감정분석 주기적 수행용 타이머
+  Timer? _emotionTimer;
+  bool _isAnalyzing = false; // 동시에 두 번 안 돌게 막기
 
   final List<String> _backgrounds = [
     'assets/background/cafe.png',
@@ -46,12 +70,26 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   late String _selectedBackground;
 
+  // ★ 통화 세션 ID (백엔드 Session.session_id)
+  int? _sessionId;
+
   @override
   void initState() {
     super.initState();
     _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
     _startTimer();
-    _startRecordingAutomatically();
+
+    // 🔥 통화 시작 == 이 화면에 들어오자마자 라고 가정
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initCamera();
+      });
+    }
+
+    _startEmotionLoop();
+
+    // ★ 통화 시작을 백엔드에 기록
+    _startCallOnServer();
   }
 
   @override
@@ -59,11 +97,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _timer?.cancel();
     _cameraController?.dispose();
     _stopRecording();
+    _stopEmotionLoop();
+
+    // ★ 혹시 정상 종료 버튼을 못 눌렀을 때를 대비해, 세션이 있고 앱이 닫힐 때 종료 요청
+    if (_sessionId != null) {
+      _endCallOnServer(); // await 못 거니까 fire-and-forget
+    }
+
     super.dispose();
   }
 
   // =========================
-  // 타이머
+  // ⏱ 타이머
   // =========================
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -81,37 +126,205 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   // =========================
-  // 카메라
+  // 🔗 통화 기록 API 연동
+  // =========================
+
+  Future<void> _startCallOnServer() async {
+    try {
+      final url = Uri.parse('$baseUrl/api/v1/calls/start');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'user_id': widget.userId, // 🔥 이 유저의 통화로 기록
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _sessionId = data['session_id'] as int;
+        });
+        debugPrint('통화 시작 기록 성공: session_id = $_sessionId');
+      } else {
+        debugPrint(
+            '통화 시작 기록 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('통화 시작 네트워크 오류: $e');
+    }
+  }
+
+  Future<void> _endCallOnServer() async {
+    if (_sessionId == null) return;
+
+    try {
+      final url = Uri.parse('$baseUrl/api/v1/calls/$_sessionId/end');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('통화 종료 기록 성공: session_id = $_sessionId');
+      } else {
+        debugPrint(
+            '통화 종료 기록 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('통화 종료 네트워크 오류: $e');
+    }
+  }
+
+  // =========================
+  // (NEW) 감정 분석 루프
+  // =========================
+
+  // ★ 5초마다 한 번씩: 음성 1~2초 녹음 + 프레임 캡처 + /dialogue/speak 호출
+  void _startEmotionLoop() {
+    _emotionTimer?.cancel();
+    _emotionTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      await _runEmotionCycle();
+    });
+  }
+
+  void _stopEmotionLoop() {
+    _emotionTimer?.cancel();
+    _emotionTimer = null;
+  }
+
+  Future<void> _runEmotionCycle() async {
+    if (kIsWeb) return;
+
+    if (_isAnalyzing) return;
+    _isAnalyzing = true;
+
+    try {
+      // 1) 음성 1~2초 녹음
+      final audioBytes = await _recordShortAudio();
+
+      // 2) 카메라 프레임 2~3장 캡처 (카메라 꺼져 있으면 빈 리스트)
+      final frameBytesList = await _captureFrames(count: 3);
+
+      // 3) 백엔드 /dialogue/speak 호출 + 말동이 TTS 재생
+      await sendToMaldongAndPlayTts(
+        audioBytes: audioBytes,
+        frameBytesList: frameBytesList,
+        userId: widget.userId, // 🔥 하드코딩 1 → 실제 userId
+      );
+    } catch (e) {
+      debugPrint("감정분석 사이클 오류: $e");
+    } finally {
+      _isAnalyzing = false;
+    }
+  }
+
+  // 🔊 1~2초 짧게 녹음해서 Uint8List 반환
+  Future<Uint8List> _recordShortAudio() async {
+    final micStatus = await Permission.microphone.request();
+    if (!micStatus.isGranted) {
+      throw Exception("마이크 권한이 없습니다.");
+    }
+
+    final hasPerm = await _audioRecorder.hasPermission();
+    if (!hasPerm) throw Exception("녹음 권한 없음");
+
+    final dir = await getTemporaryDirectory();
+    final filePath =
+        '${dir.path}/chunk_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    _recordingPath = filePath;
+
+    await _audioRecorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 128000,
+        sampleRate: 16000,
+      ),
+      path: filePath,
+    );
+
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final path = await _audioRecorder.stop();
+    if (path == null) {
+      throw Exception("녹음 실패 (path == null)");
+    }
+
+    final file = File(path);
+    return await file.readAsBytes();
+  }
+
+  // 📸 카메라로 프레임 여러 장 캡처해서 List<Uint8List>로 반환
+  Future<List<Uint8List>> _captureFrames({int count = 1}) async {
+    final List<Uint8List> frames = [];
+
+    if (!_isCameraOn ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
+      return frames;
+    }
+
+    try {
+      for (int i = 0; i < count; i++) {
+        final XFile xfile = await _cameraController!.takePicture();
+        final bytes = await xfile.readAsBytes();
+        frames.add(bytes);
+      }
+    } catch (e) {
+      debugPrint("프레임 캡처 실패: $e");
+    }
+
+    return frames;
+  }
+
+  // =========================
+  // 카메라 초기화 (웹 + 모바일)
   // =========================
 
   Future<void> _initCamera() async {
     try {
+      // 🔥 웹
       if (kIsWeb) {
-        final camera = cameras.first;
+        if (cameras.isEmpty) {
+          setState(() => _cameraErrorMessage = "사용 가능한 카메라가 없습니다.");
+          return;
+        }
+
+        final camera = cameras[_currentCameraIndex % cameras.length];
         final controller = CameraController(
           camera,
           ResolutionPreset.medium,
           enableAudio: true,
           imageFormatGroup: ImageFormatGroup.bgra8888,
         );
-        await controller.initialize();
-        if (!mounted) return;
 
+        await controller.initialize();
+
+        if (!mounted) return;
         setState(() {
           _cameraController = controller;
           _isCameraOn = true;
+          _cameraErrorMessage = null;
         });
         return;
       }
 
+      // 🔥 모바일
       if (cameras.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사용 가능한 카메라가 없습니다.')),
-        );
+        setState(() => _cameraErrorMessage = "사용 가능한 카메라가 없습니다.");
         return;
       }
 
-      final camera = cameras.first;
+      final camera = cameras[_currentCameraIndex % cameras.length];
       final controller = CameraController(
         camera,
         ResolutionPreset.medium,
@@ -119,19 +332,32 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
 
       await controller.initialize();
-      if (!mounted) return;
 
+      if (!mounted) return;
       setState(() {
         _cameraController = controller;
         _isCameraOn = true;
+        _cameraErrorMessage = null;
+      });
+    } on CameraException catch (e) {
+      debugPrint("📷 CameraException: ${e.code}, ${e.description}");
+      setState(() {
+        if (e.code == "cameraAbort") {
+          _cameraErrorMessage =
+              "브라우저 카메라 권한이 필요합니다.\n주소창 왼쪽 자물쇠 아이콘을 눌러 허용해주세요.";
+        } else {
+          _cameraErrorMessage = "카메라 오류: ${e.description ?? e.code}";
+        }
+        _isCameraOn = false;
+        _cameraController = null;
       });
     } catch (e) {
       debugPrint("카메라 초기화 실패: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('카메라 사용 불가: $e')),
-        );
-      }
+      setState(() {
+        _cameraErrorMessage = "카메라 초기화 중 문제가 발생했습니다.";
+        _isCameraOn = false;
+        _cameraController = null;
+      });
     }
   }
 
@@ -148,54 +374,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // =========================
-  // 오디오 녹음
-  // =========================
-
-  Future<void> _startRecordingAutomatically() async {
-    if (!kIsWeb) {
-      final status = await Permission.microphone.request();
-      if (!status.isGranted) return;
-    }
-
-    _startRecording();
-  }
-
-  Future<void> _startRecording() async {
-    try {
-      final hasPerm = await _audioRecorder.hasPermission();
-      if (!hasPerm) return;
-
-      // record 패키지에서 path가 required String 이라서
-      // 무조건 non-null 문자열을 만들어서 넘긴다.
-      final fakeFileName =
-          'call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
-
-      String filePath;
-
-      if (!kIsWeb) {
-        final dir = await getApplicationDocumentsDirectory();
-        filePath = '${dir.path}/$fakeFileName';
-      } else {
-        // 웹에서는 파일 시스템 경로 개념이 없으니 이름만 넘겨도 됨
-        filePath = fakeFileName;
-      }
-
-      _recordingPath = filePath;
-
-      await _audioRecorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 128000,
-          sampleRate: 44100,
-        ),
-        path: filePath,
+  Future<void> _switchCamera() async {
+    if (cameras.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("다른 카메라가 없습니다.")),
       );
-
-      debugPrint("녹음 시작됨: $filePath");
-    } catch (e) {
-      debugPrint("녹음 오류: $e");
+      return;
     }
+
+    _currentCameraIndex = (_currentCameraIndex + 1) % cameras.length;
+
+    await _cameraController?.dispose();
+    await _initCamera();
   }
 
   Future<void> _stopRecording() async {
@@ -203,7 +393,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final isRec = await _audioRecorder.isRecording();
       if (isRec) {
         await _audioRecorder.stop();
-        debugPrint("녹음 종료됨, path: $_recordingPath");
+        debugPrint("녹음 종료됨: $_recordingPath");
       }
     } catch (e) {
       debugPrint("녹음 종료 오류: $e");
@@ -230,26 +420,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       fit: BoxFit.cover,
                     ),
                   ),
-
                   Positioned.fill(
                     child: Transform.scale(
                       scale: 0.9,
                       child: widget.avatar,
                     ),
                   ),
-
                   Positioned(
                     top: 16,
                     left: 16,
                     child: _buildTimerBox(),
                   ),
-
                   Positioned(
                     top: 16,
                     right: 16,
                     child: _buildCameraPreview(),
                   ),
-
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -329,12 +515,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.camera_alt, color: Colors.white70, size: 40),
-                      SizedBox(height: 8),
+                    children: [
+                      const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white70,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 8),
                       Text(
-                        '카메라 켜기',
-                        style: TextStyle(
+                        _cameraErrorMessage ?? '카메라 켜기',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -359,8 +550,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         }),
         const SizedBox(width: 24),
         GestureDetector(
-          onTap: () {
+          onTap: () async {
             _stopRecording();
+            _stopEmotionLoop();
+            await _endCallOnServer(); // ★ 통화 종료 기록
             widget.onEndCall();
           },
           child: Container(
@@ -379,6 +572,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _circleButton(
           _isCameraOn ? Icons.videocam_off : Icons.videocam,
           _toggleCamera,
+        ),
+        const SizedBox(width: 16),
+        _circleButton(
+          Icons.cameraswitch,
+          _switchCamera,
         ),
       ],
     );
