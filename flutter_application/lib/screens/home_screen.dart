@@ -34,6 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   int selectedMonth = DateTime.now().month;
   
+  // ✅ 로그인 정보 저장
+  int? _userId;
+  String? _accessToken;
+  
   // 월별 감정 데이터
   final Map<int, EmotionData> monthlyData = {
     1: EmotionData(positive: 12, normal: 8, negative: 6, serious: 5),
@@ -68,8 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
         throw Exception('로그인 정보가 없습니다');
       }
 
-      // 1. 사용자 이름 설정
+      // ✅ 로그인 정보 저장
       setState(() {
+        _userId = userId;
+        _accessToken = token;
         userName = username ?? '사용자';
       });
 
@@ -607,13 +613,30 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '통화기록',
             isSelected: _selectedIndex == 1,
             onTap: () {
-              setState(() => _selectedIndex = 1);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CallHistoryScreen(),
-                ),
-              );
+              // ✅ userId와 accessToken이 있을 때만 이동
+              if (_userId != null && _accessToken != null) {
+                setState(() => _selectedIndex = 1);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CallHistoryScreen(
+                      userId: _userId!,
+                      accessToken: _accessToken!,
+                    ),
+                  ),
+                ).then((_) {
+                  // 돌아왔을 때 홈 탭으로 리셋
+                  setState(() => _selectedIndex = 0);
+                });
+              } else {
+                // 로그인 정보가 없는 경우
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('로그인 정보를 불러오는 중입니다...'),
+                    backgroundColor: Color(0xFFFF9800),
+                  ),
+                );
+              }
             },
           ),
           _buildNavItem(
@@ -630,7 +653,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     onLogout: () => Navigator.pop(context),
                   ),
                 ),
-              );
+              ).then((_) {
+                // 돌아왔을 때 홈 탭으로 리셋
+                setState(() => _selectedIndex = 0);
+              });
             },
           ),
         ],
