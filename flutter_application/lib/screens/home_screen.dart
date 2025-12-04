@@ -290,18 +290,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildChatButton() {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => VideoCallScreen(
-              onEndCall: () {
-                Navigator.pop(context);
-                _loadUserData();
-              },
-              avatar: MaldongAvatar(url: customAvatarUrl),
+        // ✅ userId와 accessToken이 있을 때만 이동
+        if (_userId != null && _accessToken != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VideoCallScreen(
+                onEndCall: () {
+                  Navigator.pop(context);
+                  _loadUserData();
+                },
+                avatar: MaldongAvatar(url: customAvatarUrl),
+                userId: _userId!,  // ✅ 추가
+                accessToken: _accessToken!,  // ✅ 추가
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          // 로그인 정보가 없는 경우
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('로그인 정보를 불러오는 중입니다...'),
+              backgroundColor: Color(0xFFFF9800),
+            ),
+          );
+        }
       },
       child: Container(
         width: double.infinity,

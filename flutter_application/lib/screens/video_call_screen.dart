@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:io';              // ★ 음성 파일 읽기용 (모바일/데스크톱용)
-import 'dart:typed_data';      // ★ 바이트 배열(Uint8List) 사용
+import 'dart:io'; // ★ 음성 파일 읽기용 (모바일/데스크톱용)
+import 'dart:typed_data'; // ★ 바이트 배열(Uint8List) 사용
+import 'dart:convert'; // ★ HTTP body 인코딩/디코딩
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -9,20 +10,29 @@ import 'package:camera/camera.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http; // ★ HTTP 요청
 
 import '../main.dart';
 import '../maldong_avatar.dart';
 import '../services/dialogue_service.dart'; // ★ /dialogue/speak + TTS 재생 함수
 
+// ★ 본인 환경에 맞게 수정 (에뮬레이터면 10.0.2.2, 실제 기기면 PC IP)
+const String baseUrl = 'http://localhost:8000';
+
 class VideoCallScreen extends StatefulWidget {
   final VoidCallback onEndCall;
   final Widget avatar;
 
-  // ★ (선택) 나중에 진짜 userId 쓰고 싶으면 여기에 userId 추가해도 됨
+  // ★ 실제 유저 정보
+  final int userId;
+  final String accessToken;
+
   const VideoCallScreen({
     super.key,
     required this.onEndCall,
     required this.avatar,
+    required this.userId,
+    required this.accessToken,
   });
 
   @override
@@ -60,6 +70,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   late String _selectedBackground;
 
+  // ★ 통화 세션 ID (백엔드 Session.session_id)
+  int? _sessionId;
+
   @override
   void initState() {
     super.initState();
@@ -67,18 +80,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _startTimer();
 
     // 🔥 통화 시작 == 이 화면에 들어오자마자 라고 가정
-    //    1) 카메라 준비
     if (kIsWeb) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _initCamera();
       });
     }
-    // 모바일에서는 사용자가 우측 상단 "카메라 켜기"를 눌러도 되고,
-    // 자동으로 켜고 싶다면 여기서 _initCamera()를 호출해도 됨.
-    // 예: if (!kIsWeb) _initCamera();
 
-    // 2) 감정분석(음성+프레임+LLM+TTS) 주기적 시작
     _startEmotionLoop();
+
+    // ★ 통화 시작을 백엔드에 기록
+    _startCallOnServer();
   }
 
   @override
@@ -86,12 +97,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _timer?.cancel();
     _cameraController?.dispose();
     _stopRecording();
-    _stopEmotionLoop(); // ★ 감정분석 타이머도 정리
+    _stopEmotionLoop();
+
+    // ★ 혹시 정상 종료 버튼을 못 눌렀을 때를 대비해, 세션이 있고 앱이 닫힐 때 종료 요청
+    if (_sessionId != null) {
+      _endCallOnServer(); // await 못 거니까 fire-and-forget
+    }
+
     super.dispose();
   }
 
   // =========================
-  // 타이머
+  // ⏱ 타이머
   // =========================
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -106,6 +123,65 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final mins = seconds ~/ 60;
     final secs = seconds % 60;
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  // =========================
+  // 🔗 통화 기록 API 연동
+  // =========================
+
+  Future<void> _startCallOnServer() async {
+    try {
+      final url = Uri.parse('$baseUrl/api/v1/calls/start');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'user_id': widget.userId, // 🔥 이 유저의 통화로 기록
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        setState(() {
+          _sessionId = data['session_id'] as int;
+        });
+        debugPrint('통화 시작 기록 성공: session_id = $_sessionId');
+      } else {
+        debugPrint(
+            '통화 시작 기록 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('통화 시작 네트워크 오류: $e');
+    }
+  }
+
+  Future<void> _endCallOnServer() async {
+    if (_sessionId == null) return;
+
+    try {
+      final url = Uri.parse('$baseUrl/api/v1/calls/$_sessionId/end');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('통화 종료 기록 성공: session_id = $_sessionId');
+      } else {
+        debugPrint(
+            '통화 종료 기록 실패: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('통화 종료 네트워크 오류: $e');
+    }
   }
 
   // =========================
@@ -126,7 +202,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Future<void> _runEmotionCycle() async {
-    // 웹에서는 record/dart:io 지원이 안 되므로, 감정분석 루프는 모바일/데스크톱에서만 돌도록
     if (kIsWeb) return;
 
     if (_isAnalyzing) return;
@@ -143,7 +218,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       await sendToMaldongAndPlayTts(
         audioBytes: audioBytes,
         frameBytesList: frameBytesList,
-        userId: 1, // ★ TODO: 로그인 연결 후 실제 userId로 교체
+        userId: widget.userId, // 🔥 하드코딩 1 → 실제 userId
       );
     } catch (e) {
       debugPrint("감정분석 사이클 오류: $e");
@@ -154,7 +229,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   // 🔊 1~2초 짧게 녹음해서 Uint8List 반환
   Future<Uint8List> _recordShortAudio() async {
-    // 마이크 권한
     final micStatus = await Permission.microphone.request();
     if (!micStatus.isGranted) {
       throw Exception("마이크 권한이 없습니다.");
@@ -163,7 +237,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final hasPerm = await _audioRecorder.hasPermission();
     if (!hasPerm) throw Exception("녹음 권한 없음");
 
-    // 임시 파일 경로
     final dir = await getTemporaryDirectory();
     final filePath =
         '${dir.path}/chunk_${DateTime.now().millisecondsSinceEpoch}.m4a';
@@ -179,7 +252,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       path: filePath,
     );
 
-    // 🔹 1.5초 정도 녹음
     await Future.delayed(const Duration(milliseconds: 1500));
 
     final path = await _audioRecorder.stop();
@@ -198,7 +270,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     if (!_isCameraOn ||
         _cameraController == null ||
         !_cameraController!.value.isInitialized) {
-      // 카메라 꺼져 있으면 프레임 없이도 감정분석은 돌아감 (텍스트/음성 기반)
       return frames;
     }
 
@@ -268,7 +339,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _isCameraOn = true;
         _cameraErrorMessage = null;
       });
-
     } on CameraException catch (e) {
       debugPrint("📷 CameraException: ${e.code}, ${e.description}");
       setState(() {
@@ -281,7 +351,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _isCameraOn = false;
         _cameraController = null;
       });
-
     } catch (e) {
       debugPrint("카메라 초기화 실패: $e");
       setState(() {
@@ -305,7 +374,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // ★ 전면/후면 카메라 전환
   Future<void> _switchCamera() async {
     if (cameras.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -319,10 +387,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     await _cameraController?.dispose();
     await _initCamera();
   }
-
-  // =========================
-  // (기존) 전체 통화 녹음 종료용 (지금은 감정분석용 짧은 녹음만 사용)
-  // =========================
 
   Future<void> _stopRecording() async {
     try {
@@ -356,26 +420,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       fit: BoxFit.cover,
                     ),
                   ),
-
                   Positioned.fill(
                     child: Transform.scale(
                       scale: 0.9,
                       child: widget.avatar,
                     ),
                   ),
-
                   Positioned(
                     top: 16,
                     left: 16,
                     child: _buildTimerBox(),
                   ),
-
                   Positioned(
                     top: 16,
                     right: 16,
                     child: _buildCameraPreview(),
                   ),
-
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -462,8 +522,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                         size: 40,
                       ),
                       const SizedBox(height: 8),
-
-                      // 에러 메시지 표시 또는 "카메라 켜기"
                       Text(
                         _cameraErrorMessage ?? '카메라 켜기',
                         textAlign: TextAlign.center,
@@ -492,9 +550,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         }),
         const SizedBox(width: 24),
         GestureDetector(
-          onTap: () {
+          onTap: () async {
             _stopRecording();
-            _stopEmotionLoop(); // ★ 통화 종료 시 감정분석도 정지
+            _stopEmotionLoop();
+            await _endCallOnServer(); // ★ 통화 종료 기록
             widget.onEndCall();
           },
           child: Container(
@@ -515,7 +574,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           _toggleCamera,
         ),
         const SizedBox(width: 16),
-        // ★ 전면/후면 전환 버튼
         _circleButton(
           Icons.cameraswitch,
           _switchCamera,

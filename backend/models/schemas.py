@@ -175,3 +175,26 @@ class WardInfoResponse(BaseModel):
     user_id: int
     username: str
     user_phone: str
+
+# -------------------------
+# 7. 통화기록(Session) 스키마
+# -------------------------
+class SessionBase(BaseModel):
+    user_id: int
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+
+
+class SessionCreate(SessionBase):
+    """통화 종료 시 기록 저장할 때 사용"""
+    pass
+
+
+class SessionResponse(SessionBase):
+    """통화기록 조회용"""
+    session_id: int
+
+
+class SessionListResponse(BaseModel):
+    sessions: List[SessionResponse]
