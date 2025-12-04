@@ -8,7 +8,7 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../main.dart'; 
+import '../main.dart';
 import '../maldong_avatar.dart';
 
 class VideoCallScreen extends StatefulWidget {
@@ -32,6 +32,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   CameraController? _cameraController;
   bool _isCameraOn = false;
 
+  // 🔥 추가된 부분: 카메라 에러 메시지 저장용
+  String? _cameraErrorMessage;
+
   final AudioRecorder _audioRecorder = AudioRecorder();
   String? _recordingPath;
 
@@ -52,6 +55,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _selectedBackground = _backgrounds[Random().nextInt(_backgrounds.length)];
     _startTimer();
     _startRecordingAutomatically();
+
+    // 🔥 추가된 부분: 웹이면 자동 카메라 권한 팝업 뜨도록 실행
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _initCamera();
+      });
+    }
   }
 
   @override
@@ -81,12 +91,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   // =========================
-  // 카메라
+  // 카메라 초기화 (웹 + 모바일)
   // =========================
 
   Future<void> _initCamera() async {
     try {
+      // 🔥 웹
       if (kIsWeb) {
+        if (cameras.isEmpty) {
+          setState(() => _cameraErrorMessage = "사용 가능한 카메라가 없습니다.");
+          return;
+        }
+
         final camera = cameras.first;
         final controller = CameraController(
           camera,
@@ -94,20 +110,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           enableAudio: true,
           imageFormatGroup: ImageFormatGroup.bgra8888,
         );
-        await controller.initialize();
-        if (!mounted) return;
 
+        await controller.initialize();
+
+        if (!mounted) return;
         setState(() {
           _cameraController = controller;
           _isCameraOn = true;
+          _cameraErrorMessage = null;
         });
         return;
       }
 
+      // 🔥 모바일
       if (cameras.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사용 가능한 카메라가 없습니다.')),
-        );
+        setState(() => _cameraErrorMessage = "사용 가능한 카메라가 없습니다.");
         return;
       }
 
@@ -119,19 +136,34 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       );
 
       await controller.initialize();
-      if (!mounted) return;
 
+      if (!mounted) return;
       setState(() {
         _cameraController = controller;
         _isCameraOn = true;
+        _cameraErrorMessage = null;
       });
+
+    } on CameraException catch (e) {
+      debugPrint("📷 CameraException: ${e.code}, ${e.description}");
+      setState(() {
+        if (e.code == "cameraAbort") {
+          _cameraErrorMessage =
+              "브라우저 카메라 권한이 필요합니다.\n주소창 왼쪽 자물쇠 아이콘을 눌러 허용해주세요.";
+        } else {
+          _cameraErrorMessage = "카메라 오류: ${e.description ?? e.code}";
+        }
+        _isCameraOn = false;
+        _cameraController = null;
+      });
+
     } catch (e) {
       debugPrint("카메라 초기화 실패: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('카메라 사용 불가: $e')),
-        );
-      }
+      setState(() {
+        _cameraErrorMessage = "카메라 초기화 중 문제가 발생했습니다.";
+        _isCameraOn = false;
+        _cameraController = null;
+      });
     }
   }
 
@@ -166,8 +198,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final hasPerm = await _audioRecorder.hasPermission();
       if (!hasPerm) return;
 
-      // record 패키지에서 path가 required String 이라서
-      // 무조건 non-null 문자열을 만들어서 넘긴다.
       final fakeFileName =
           'call_audio_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
@@ -177,7 +207,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         final dir = await getApplicationDocumentsDirectory();
         filePath = '${dir.path}/$fakeFileName';
       } else {
-        // 웹에서는 파일 시스템 경로 개념이 없으니 이름만 넘겨도 됨
         filePath = fakeFileName;
       }
 
@@ -203,7 +232,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       final isRec = await _audioRecorder.isRecording();
       if (isRec) {
         await _audioRecorder.stop();
-        debugPrint("녹음 종료됨, path: $_recordingPath");
+        debugPrint("녹음 종료됨: $_recordingPath");
       }
     } catch (e) {
       debugPrint("녹음 종료 오류: $e");
@@ -329,12 +358,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.camera_alt, color: Colors.white70, size: 40),
-                      SizedBox(height: 8),
+                    children: [
+                      const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white70,
+                        size: 40,
+                      ),
+                      const SizedBox(height: 8),
+
+                      // 🔥 에러 메시지 표시 또는 "카메라 켜기"
                       Text(
-                        '카메라 켜기',
-                        style: TextStyle(
+                        _cameraErrorMessage ?? '카메라 켜기',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
