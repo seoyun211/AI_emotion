@@ -240,9 +240,17 @@ class _AppRootState extends State<AppRoot> {
         );
 
       case AppScreen.videocall:
+        // ✅ 로그인 정보가 없으면 로그인 화면으로
+        if (_userId == null || _accessToken == null) {
+          return LoginScreen(
+            onLoginSuccess: _handleLoginSuccess,
+          );
+        }
         return VideoCallScreen(
           onEndCall: _endCall,
           avatar: MaldongAvatar(url: customAvatarUrl),
+          userId: _userId!,  // ✅ 추가
+          accessToken: _accessToken!,  // ✅ 추가
         );
 
       case AppScreen.settings:
