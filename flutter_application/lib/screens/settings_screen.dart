@@ -6,16 +6,15 @@ import 'profile_edit_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback onLogout;
+  final VoidCallback? onLogout;
 
   const SettingsScreen({
     super.key,
     required this.onBack,
-    required this.onLogout,
+    this.onLogout,
   });
 
   Future<void> _handleLogout(BuildContext context) async {
-    // 확인 다이얼로그 표시
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -72,26 +71,32 @@ class SettingsScreen extends StatelessWidget {
     );
 
     if (shouldLogout == true) {
-      // SharedPreferences에서 토큰 삭제
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('access_token');
       await prefs.remove('user_role');
       await prefs.remove('user_id');
-      
-      // 로그아웃 성공 메시지
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('로그아웃되었습니다'),
-            backgroundColor: Color(0xFFFF9800),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        // 약간의 딜레이 후 로그아웃 콜백 실행
-        await Future.delayed(const Duration(milliseconds: 300));
-        onLogout();
-      }
+
+      if (!context.mounted) return;
+
+      // ⭐ 빠른 로그아웃 처리: pushAndRemoveUntil로 즉시 스택 초기화
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) {
+          // 로그아웃 콜백 트리거 (AppRoot의 _logout)
+          if (onLogout != null) onLogout!();
+          return const SizedBox.shrink(); // 빈 위젯 반환(잠깐)
+        }),
+        (route) => false,
+      );
+
+      // 스낵바는 최상위 context에서 즉시 표시
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그아웃되었습니다'),
+          backgroundColor: Color(0xFFFF9800),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
@@ -130,8 +135,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-              
-              // 설정 카드
+
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
@@ -193,10 +197,9 @@ class SettingsScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              
-              // 로그아웃 버튼
+
               GestureDetector(
                 onTap: () => _handleLogout(context),
                 child: Container(
