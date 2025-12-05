@@ -3,10 +3,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from backend.services.emotion_service import analyze_video_pipeline
-from backend.services.alert_service import create_alert
-from backend.routers.analyses import save_analysis  # 감정 결과 저장 함수 (직접 구현 필요)
-
+from services.emotion_service import process_emotion_analysis
+#from services.alert_service import create_alert
+from routers.analyses import save_analysis
 from database.session import get_db_connection
 
 router = APIRouter(prefix="/api/v1/calls", tags=["통화 기록"])
@@ -95,7 +94,7 @@ def end_call(session_id: int):
             """
             cur.execute(update_sql, (end_time, duration, session_id))
             conn.commit()
-
+        '''
         # ✅ 1. 감정 분석 실행 (영상 파일 경로는 실제 저장 위치에 맞게 수정)
         video_path = f"temp_uploads/{session_id}.mp4"
         result = analyze_video_pipeline(video_path)
@@ -106,14 +105,14 @@ def end_call(session_id: int):
         # ✅ 3. 위험 감정 감지 시 알림 생성
         if result["risk_score"] >= 0.7:
             create_alert(user_id=row["user_id"], chunk_id=result.get("chunk_id"), alert_type="High_RiskScore")
-
+        
         return CallResponse(
             session_id=session_id,
             user_id=row["user_id"],
             start_time=start_time,
             end_time=end_time,
             duration_seconds=duration,
-        )
+        )'''
 
     except HTTPException:
         # 위에서 이미 적절한 상태코드로 던진 것들은 그대로 다시 raise
