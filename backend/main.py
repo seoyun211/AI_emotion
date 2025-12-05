@@ -12,7 +12,8 @@ from routers.alerts import router as alerts_router
 from routers.users import router as users_router
 from routers.auth import router as auth_router
 from routers.guardian import router as guardian_router
-from routers.calls import router as calls_router  # ✅ 추가
+from routers.calls import router as calls_router  
+from routers.analyses import router as analyses_router 
 
 # -------------------------
 # 🚀 FastAPI 앱 및 미들웨어 설정
@@ -35,7 +36,8 @@ app.include_router(alerts_router)
 app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(guardian_router)
-app.include_router(calls_router)  # ✅ 추가
+app.include_router(calls_router) 
+app.include_router(analyses_router)   
 
 # 👉 나중에 새 앙상블 엔드포인트 만들면 여기서 새로운 router를 include 하면 돼
 # from routers.ensemble import router as ensemble_router

@@ -152,29 +152,32 @@ class MultiModalEmotionResponse(BaseModel):
     needs_alert: bool
     message: Optional[str] = None
 
-    # 🔥 새로 추가한 필드: 앙상블 상세 (필요할 때만 내려줘도 됨)
     ensemble_detail: Optional[EnsembleDetail] = None
 
 
 class DailyEmotionResponse(BaseModel):
-    date: str  # "2024-01-15" 형식
+    date: str
     emotion: str  # "0", "2", "3", "5"
     emotion_name: str  # "기쁨", "분노", "불안", "슬픔"
-    severity: str  # "긍정", "보통", "부정", "심각"
+    severity: str
     avg_risk_score: float
 
 
+# ------------------------------------------------
+# ⭐⭐⭐ 수정된 부분: 감정 4종 그대로 반환하는 구조
+# ------------------------------------------------
 class EmotionStatsResponse(BaseModel):
-    positive: int  # 긍정 (기쁨)
-    normal: int    # 보통 (불안 + 낮은 위험도)
-    negative: int  # 부정 (분노/불안 + 중간 위험도)
-    serious: int   # 심각 (슬픔 + 높은 위험도)
+    joy: int      # 기쁨
+    anger: int    # 분노
+    anxiety: int  # 불안
+    sadness: int  # 슬픔
 
 
 class WardInfoResponse(BaseModel):
     user_id: int
     username: str
     user_phone: str
+
 
 # -------------------------
 # 7. 통화기록(Session) 스키마
