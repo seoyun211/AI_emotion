@@ -27,26 +27,28 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """사용자 조회/회원가입 응답"""
     user_id: int
     username: str
+    user_phone: str          
     gender: str
     role: str
+    birth_date: date        
     address: Optional[str] = None
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
 
 
 class User(BaseModel):
-    """DB 조회용 내부 유저 모델"""
     user_id: int
     username: str
     password: str
+    user_phone: str          
     gender: str
     birth_date: date
     address: Optional[str]
     guardian_name: Optional[str]
     guardian_phone: Optional[str]
+
 
 
 # -------------------------
