@@ -27,32 +27,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String currentEmotion = '기쁨';
-  String emotionLevel = '긍정';
+  String? currentEmotion; // null이면 오늘 감정 기록 없음
   String userName = '사용자';
   int _selectedIndex = 0;
   bool _isLoading = true;
   int selectedMonth = DateTime.now().month;
+  int selectedYear = DateTime.now().year;
   
-  // ✅ 로그인 정보 저장
+  // 로그인 정보 저장
   int? _userId;
   String? _accessToken;
   
-  // 월별 감정 데이터
-  final Map<int, EmotionData> monthlyData = {
-    1: EmotionData(positive: 12, normal: 8, negative: 6, serious: 5),
-    2: EmotionData(positive: 15, normal: 7, negative: 4, serious: 2),
-    3: EmotionData(positive: 18, normal: 6, negative: 4, serious: 3),
-    4: EmotionData(positive: 20, normal: 5, negative: 3, serious: 2),
-    5: EmotionData(positive: 16, normal: 8, negative: 4, serious: 2),
-    6: EmotionData(positive: 14, normal: 9, negative: 5, serious: 2),
-    7: EmotionData(positive: 17, normal: 7, negative: 4, serious: 2),
-    8: EmotionData(positive: 19, normal: 6, negative: 3, serious: 2),
-    9: EmotionData(positive: 15, normal: 8, negative: 5, serious: 2),
-    10: EmotionData(positive: 13, normal: 10, negative: 5, serious: 2),
-    11: EmotionData(positive: 16, normal: 8, negative: 4, serious: 2),
-    12: EmotionData(positive: 18, normal: 7, negative: 3, serious: 2),
-  };
+  // 월별 감정 데이터 (DB에서 가져옴)
+  Map<String, EmotionData> monthlyData = {};
 
   @override
   void initState() {
@@ -72,45 +59,21 @@ class _HomeScreenState extends State<HomeScreen> {
         throw Exception('로그인 정보가 없습니다');
       }
 
-      // ✅ 로그인 정보 저장
       setState(() {
         _userId = userId;
         _accessToken = token;
         userName = username ?? '사용자';
       });
 
-      // 2. 최근 감정 목록 가져오기 (limit=1로 가장 최근 것만)
-      final emotionUrl = Uri.parse('$baseUrl/api/v1/emotions/$userId/list?limit=1');
-      final emotionResponse = await http.get(
-        emotionUrl,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      // 최근 감정과 월별 통계를 병렬로 로드
+      await Future.wait([
+        _loadLatestEmotion(userId, token),
+        _loadMonthlyStats(userId, token, selectedYear, selectedMonth),
+      ]);
 
-      if (emotionResponse.statusCode == 200) {
-        final data = jsonDecode(emotionResponse.body);
-        final emotions = data['emotions'] as List;
-        
-        if (emotions.isNotEmpty) {
-          final latestEmotion = emotions[0];
-          
-          setState(() {
-            currentEmotion = latestEmotion['emotion'] ?? '기쁨';
-            emotionLevel = _getEmotionLevelFromEmotion(currentEmotion);
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      } else {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
       print('데이터 로드 오류: $e');
       setState(() {
@@ -119,21 +82,101 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // 감정 이름으로 감정 레벨 추론
-  String _getEmotionLevelFromEmotion(String emotion) {
-    // 감정 매핑: 기쁨:0 당황:1 분노:2 불안:3 상처:4 슬픔:5 중립:6 역겨움:7 공포:8 놀람:9
-    
-    if (emotion == '기쁨' || emotion == '놀람') {
-      return '긍정';
-    } else if (emotion == '중립' || emotion == '당황') {
-      return '보통';
-    } else if (emotion == '불안' || emotion == '상처' || emotion == '슬픔') {
-      return '부정';
-    } else if (emotion == '분노' || emotion == '역겨움' || emotion == '공포') {
-      return '심각';
-    } else {
-      return '보통';
+  // 최근 감정 로드
+  Future<void> _loadLatestEmotion(int userId, String token) async {
+    try {
+      final url = Uri.parse('$baseUrl/api/v1/emotions/$userId/latest');
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        // emotion이 null이거나 비어있으면 오늘 감정 기록 없음
+        if (data['emotion'] != null && data['emotion'].toString().isNotEmpty) {
+          setState(() {
+            currentEmotion = data['emotion'];
+          });
+        } else {
+          setState(() {
+            currentEmotion = null; // 감정 기록 없음
+          });
+        }
+      } else {
+        setState(() {
+          currentEmotion = null;
+        });
+      }
+    } catch (e) {
+      print('최근 감정 로드 오류: $e');
+      setState(() {
+        currentEmotion = null;
+      });
     }
+  }
+
+  // 월별 감정 통계 로드
+  Future<void> _loadMonthlyStats(int userId, String token, int year, int month) async {
+    try {
+      final url = Uri.parse(
+        '$baseUrl/api/v1/emotions/$userId/monthly-stats?year=$year&month=$month'
+      );
+      
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        final emotionData = EmotionData(
+          joy: data['joy'] ?? 0,
+          anger: data['anger'] ?? 0,
+          anxiety: data['anxiety'] ?? 0,
+          sadness: data['sadness'] ?? 0,
+        );
+
+        setState(() {
+          monthlyData['$year-$month'] = emotionData;
+        });
+      }
+    } catch (e) {
+      print('월별 통계 로드 오류: $e');
+      // 오류 발생 시 빈 데이터로 초기화
+      setState(() {
+        monthlyData['$year-$month'] = EmotionData(
+          joy: 0,
+          anger: 0,
+          anxiety: 0,
+          sadness: 0,
+        );
+      });
+    }
+  }
+
+  // 월 변경 시 데이터 다시 로드
+  Future<void> _onMonthChanged(int newMonth) async {
+    setState(() {
+      selectedMonth = newMonth;
+      _isLoading = true;
+    });
+
+    if (_userId != null && _accessToken != null) {
+      await _loadMonthlyStats(_userId!, _accessToken!, selectedYear, selectedMonth);
+    }
+
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -149,7 +192,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final currentData = monthlyData[selectedMonth]!;
+    final currentData = monthlyData['$selectedYear-$selectedMonth'] ?? 
+      EmotionData(joy: 0, anger: 0, anxiety: 0, sadness: 0);
     final total = currentData.total;
 
     return Scaffold(
@@ -168,11 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
                         children: [
-                          // 말동이와 영상통화 버튼
                           _buildChatButton(),
                           const SizedBox(height: 40),
-
-                          // 감정 기록 섹션
                           _buildEmotionRecordSection(currentData, total),
                         ],
                       ),
@@ -190,6 +231,88 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildEmotionBanner() {
+    // 오늘 감정 기록이 없는 경우
+    if (currentEmotion == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB74D).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.waving_hand,
+                    size: 32,
+                    color: Color(0xFFFF9800),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$userName님, 안녕하세요!',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF8D6E63),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        '오늘은 어떤 하루인가요?',
+                        style: TextStyle(
+                          fontSize: 24,
+                          color: Color(0xFF5D4037),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFB74D).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                '말동이와 대화하며 오늘의 기분을 기록해보세요 🌟',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Color(0xFFFF9800),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 감정 기록이 있는 경우 (기존 코드)
     Color emotionColor = _getEmotionColor();
     String comment = _getEmotionComment();
 
@@ -249,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         Flexible(
                           child: Text(
-                            currentEmotion,
+                            currentEmotion!,
                             style: TextStyle(
                               fontSize: 28,
                               color: emotionColor,
@@ -290,7 +413,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildChatButton() {
     return GestureDetector(
       onTap: () {
-        // ✅ userId와 accessToken이 있을 때만 이동
         if (_userId != null && _accessToken != null) {
           Navigator.push(
             context,
@@ -301,13 +423,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   _loadUserData();
                 },
                 avatar: MaldongAvatar(url: customAvatarUrl),
-                userId: _userId!,  // ✅ 추가
-                accessToken: _accessToken!,  // ✅ 추가
+                userId: _userId!,
+                accessToken: _accessToken!,
               ),
             ),
           );
         } else {
-          // 로그인 정보가 없는 경우
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('로그인 정보를 불러오는 중입니다...'),
@@ -371,26 +492,67 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 16),
 
-        // 월 선택
         _buildMonthSelector(),
         const SizedBox(height: 24),
 
-        // 가장 많은 감정
-        _buildTopEmotion(currentData),
-        const SizedBox(height: 24),
-
-        // 감정 카드들
-        _buildEmotionCard('긍정', currentData.positive, total, 
-          const Color(0xFF66BB6A), '😊'),
-        const SizedBox(height: 12),
-        _buildEmotionCard('보통', currentData.normal, total, 
-          const Color(0xFFFFB74D), '😐'),
-        const SizedBox(height: 12),
-        _buildEmotionCard('부정', currentData.negative, total, 
-          const Color(0xFF64B5F6), '😕'),
-        const SizedBox(height: 12),
-        _buildEmotionCard('심각', currentData.serious, total, 
-          const Color(0xFFEF5350), '😢'),
+        // 데이터가 없을 경우 메시지 표시
+        if (total == 0)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: const [
+                Icon(
+                  Icons.calendar_today,
+                  size: 64,
+                  color: Color(0xFFBDBDBD),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  '이번 달 감정 기록이 없어요',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Color(0xFF757575),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '말동이와 대화를 시작해보세요!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF9E9E9E),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          _buildTopEmotion(currentData),
+          const SizedBox(height: 24),
+          _buildEmotionCard('기쁨', currentData.joy, total, 
+            const Color(0xFF66BB6A), '😊'),
+          const SizedBox(height: 12),
+          _buildEmotionCard('분노', currentData.anger, total, 
+            const Color(0xFFEF5350), '😡'),
+          const SizedBox(height: 12),
+          _buildEmotionCard('불안', currentData.anxiety, total, 
+            const Color(0xFF64B5F6), '😟'),
+          const SizedBox(height: 12),
+          _buildEmotionCard('슬픔', currentData.sadness, total, 
+            const Color(0xFF9575CD), '😢'),
+        ],
       ],
     );
   }
@@ -413,9 +575,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           IconButton(
             onPressed: () {
-              setState(() {
-                selectedMonth = selectedMonth > 1 ? selectedMonth - 1 : 12;
-              });
+              int newMonth = selectedMonth > 1 ? selectedMonth - 1 : 12;
+              _onMonthChanged(newMonth);
             },
             icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037), size: 28),
           ),
@@ -433,9 +594,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             onPressed: () {
-              setState(() {
-                selectedMonth = selectedMonth < 12 ? selectedMonth + 1 : 1;
-              });
+              int newMonth = selectedMonth < 12 ? selectedMonth + 1 : 1;
+              _onMonthChanged(newMonth);
             },
             icon: const Icon(Icons.chevron_right, color: Color(0xFF5D4037), size: 28),
           ),
@@ -450,29 +610,21 @@ class _HomeScreenState extends State<HomeScreen> {
     Color topColor;
     String emoji;
 
-    if (data.positive >= data.normal && 
-        data.positive >= data.negative && 
-        data.positive >= data.serious) {
-      topEmotion = '긍정';
-      topCount = data.positive;
-      topColor = const Color(0xFF66BB6A);
-      emoji = '😊';
-    } else if (data.normal >= data.negative && data.normal >= data.serious) {
-      topEmotion = '보통';
-      topCount = data.normal;
-      topColor = const Color(0xFFFFB74D);
-      emoji = '😐';
-    } else if (data.negative >= data.serious) {
-      topEmotion = '부정';
-      topCount = data.negative;
-      topColor = const Color(0xFF64B5F6);
-      emoji = '😕';
-    } else {
-      topEmotion = '심각';
-      topCount = data.serious;
-      topColor = const Color(0xFFEF5350);
-      emoji = '😢';
-    }
+    // 4개 감정 중 가장 많은 것 찾기
+    final emotions = [
+      {'name': '기쁨', 'count': data.joy, 'color': const Color(0xFF66BB6A), 'emoji': '😊'},
+      {'name': '분노', 'count': data.anger, 'color': const Color(0xFFEF5350), 'emoji': '😡'},
+      {'name': '불안', 'count': data.anxiety, 'color': const Color(0xFF64B5F6), 'emoji': '😟'},
+      {'name': '슬픔', 'count': data.sadness, 'color': const Color(0xFF9575CD), 'emoji': '😢'},
+    ];
+
+    emotions.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
+    
+    final top = emotions.first;
+    topEmotion = top['name'] as String;
+    topCount = top['count'] as int;
+    topColor = top['color'] as Color;
+    emoji = top['emoji'] as String;
 
     return Container(
       width: double.infinity,
@@ -626,7 +778,6 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '통화기록',
             isSelected: _selectedIndex == 1,
             onTap: () {
-              // ✅ userId와 accessToken이 있을 때만 이동
               if (_userId != null && _accessToken != null) {
                 setState(() => _selectedIndex = 1);
                 Navigator.push(
@@ -638,11 +789,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ).then((_) {
-                  // 돌아왔을 때 홈 탭으로 리셋
                   setState(() => _selectedIndex = 0);
                 });
               } else {
-                // 로그인 정보가 없는 경우
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('로그인 정보를 불러오는 중입니다...'),
@@ -667,7 +816,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ).then((_) {
-                // 돌아왔을 때 홈 탭으로 리셋
                 setState(() => _selectedIndex = 0);
               });
             },
@@ -708,44 +856,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   IconData _getEmotionIcon() {
-    switch (emotionLevel) {
-      case '긍정':
+    if (currentEmotion == null) return Icons.waving_hand;
+    
+    switch (currentEmotion) {
+      case '기쁨':
         return Icons.sentiment_very_satisfied;
-      case '보통':
-        return Icons.sentiment_satisfied;
-      case '부정':
-        return Icons.sentiment_dissatisfied;
-      case '심각':
+      case '분노':
         return Icons.sentiment_very_dissatisfied;
+      case '불안':
+        return Icons.sentiment_dissatisfied;
+      case '슬픔':
+        return Icons.sentiment_dissatisfied;
       default:
         return Icons.sentiment_neutral;
     }
   }
 
   Color _getEmotionColor() {
-    switch (emotionLevel) {
-      case '긍정':
+    if (currentEmotion == null) return const Color(0xFFFF9800);
+    
+    switch (currentEmotion) {
+      case '기쁨':
         return const Color(0xFF66BB6A);
-      case '보통':
-        return const Color(0xFFFFB74D);
-      case '부정':
-        return const Color(0xFF64B5F6);
-      case '심각':
+      case '분노':
         return const Color(0xFFEF5350);
+      case '불안':
+        return const Color(0xFF64B5F6);
+      case '슬픔':
+        return const Color(0xFF9575CD);
       default:
         return Colors.grey;
     }
   }
 
   String _getEmotionComment() {
-    switch (emotionLevel) {
-      case '긍정':
+    if (currentEmotion == null) {
+      return '말동이와 대화하며 오늘의 기분을 기록해보세요 🌟';
+    }
+    
+    switch (currentEmotion) {
+      case '기쁨':
         return '오늘은 표정이 밝아 보여요 😊';
-      case '보통':
-        return '평온한 하루를 보내고 계시네요';
-      case '부정':
-        return '조금 힘든 하루인가요? 말동이가 함께할게요';
-      case '심각':
+      case '분노':
+        return '화가 나는 일이 있으셨나요? 말동이가 들어드릴게요';
+      case '불안':
+        return '조금 불안하신가요? 말동이와 함께 이야기해요';
+      case '슬픔':
         return '많이 힘드시죠? 언제든 이야기 나눠요';
       default:
         return '오늘 하루는 어떠셨나요?';
@@ -754,17 +910,17 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class EmotionData {
-  final int positive;
-  final int normal;
-  final int negative;
-  final int serious;
+  final int joy;
+  final int anger;
+  final int anxiety;
+  final int sadness;
 
   EmotionData({
-    required this.positive,
-    required this.normal,
-    required this.negative,
-    required this.serious,
+    required this.joy,
+    required this.anger,
+    required this.anxiety,
+    required this.sadness,
   });
 
-  int get total => positive + normal + negative + serious;
+  int get total => joy + anger + anxiety + sadness;
 }
