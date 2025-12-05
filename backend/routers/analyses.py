@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Tuple
 from datetime import datetime
+import uuid
 
 from database.session import get_db_connection
 from models.schemas import EmotionStatsResponse  # 감정 통계 응답 스키마
@@ -113,6 +114,42 @@ def _get_month_range(year: int, month: int) -> Tuple[datetime, datetime]:
         end = datetime(year, month + 1, 1)
     return start, end
 
+#감정 분석 결과 저장 
+def save_analysis(session_id: int, user_id: int, result: dict) -> int:
+    """
+    감정 분석 결과를 AnalysisChunk 테이블에 저장하고 chunk_id 반환
+    result: analyze_video_pipeline 결과 딕셔너리
+    """
+    conn = get_db_connection()
+    try:
+        now = datetime.now()
+        with conn.cursor() as cur:
+            sql = """
+            INSERT INTO AnalysisChunk
+              (session_id, user_id, analysis_id, analysis_time,
+               text_result, audio_result, face_result,
+               risk_score, final_result)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cur.execute(sql, (
+                session_id,
+                user_id,
+                str(uuid.uuid4()),   # 고유 분석 ID
+                now,
+                result.get("text_top"),
+                result.get("audio_top"),
+                result.get("image_top"),
+                result.get("risk_score"),
+                result.get("final_emotion"),
+            ))
+            conn.commit()
+            chunk_id = cur.lastrowid
+        return chunk_id
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"분석 저장 실패: {e}")
+    finally:
+        conn.close()
 
 # --------------------------------------------------------------------
 # 📌 새 API: 특정 유저의 "이번 달 감정 통계" 조회
