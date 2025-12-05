@@ -1,16 +1,31 @@
 # routers/calls.py
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, status, Response
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 
 from database.session import get_db_connection
 
+from services.stt_service import convert_audio_to_text
+from services.llm_service import get_llm_response
+from services.tts_service import tts_synthesize_to_bytes
+
+# (임시) 감정 분석 함수 정의 (실제로는 별도 서비스 파일에 분리되어야 함)
+def analyze_emotion(text: str):
+    # 실제 감정 분석 모델 호출 로직이 들어갈 자리입니다.
+    # 일단은 텍스트 길이로 대충 처리
+    emotion = "기쁨" if len(text) > 10 else "안정"
+    return {
+        "emotion": emotion,
+        "confidence": 0.95,
+        "risk_score": 0.10
+    }
+
 router = APIRouter(prefix="/api/v1/calls", tags=["통화 기록"])
 
 
 class CallStartRequest(BaseModel):
-    user_id: int  # 통화 주체 회원 ID
+    user_id: int # 통화 주체 회원 ID
 
 
 class CallResponse(BaseModel):
@@ -23,6 +38,13 @@ class CallResponse(BaseModel):
 
 class CallListResponse(BaseModel):
     calls: List[CallResponse]
+
+class DialogueResponse(BaseModel):
+    user_text: str
+    maldong_response: str # maldongi -> maldong 변경
+    emotion: str
+    risk_score: float
+    session_id: int
 
 
 @router.post("/start", response_model=CallResponse)
@@ -70,7 +92,7 @@ def end_call(session_id: int):
                 SELECT user_id, start_time, end_time
                 FROM `Session`
                 WHERE session_id = %s
-                """,  # ✅ Session_id → session_id (컬럼명 소문자)
+                """, # ✅ Session_id → session_id (컬럼명 소문자)
                 (session_id,),
             )
             row = cur.fetchone()
@@ -145,5 +167,105 @@ def get_call_history_by_user(user_id: int):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"통화 기록 조회 실패: {e}")
+    finally:
+        conn.close()
+
+@router.post("/dialogue/{session_id}")
+async def process_dialogue_turn(
+    session_id: int, # 현재 진행 중인 통화(세션) ID
+    audio_file: UploadFile = File(..., description="사용자 음성 파일")
+):
+    """
+    STT, 감정 분석, LLM 응답 생성을 한 번에 처리하는 단일 대화 턴 엔드포인트.
+    """
+    conn = get_db_connection() # DB 연결을 통해 session_id 유효성 검사 및 로그 저장 가능
+    try:
+        # 1. 오디오 파일 데이터 읽기
+        audio_data = await audio_file.read()
+        
+        if not audio_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="오디오 파일 데이터가 비어있습니다."
+            )
+
+        # 2. STT (Speech-to-Text) 수행
+        user_text = convert_audio_to_text(audio_data)
+        
+        if "STT 처리 중 오류 발생" in user_text or user_text == "음성 인식 결과가 없습니다.":
+            # 오류 발생 시, TTS를 거치지 않고 JSON 형태로 오류 메시지를 반환하는 것이 클라이언트 처리에는 더 안전합니다.
+            return Response(
+                content=f'{{"error": "STT 처리 오류 또는 결과 없음: {user_text}"}}',
+                media_type="application/json",
+                status_code=500
+            )
+        
+        # 3. 감정 분석 및 위험도 판단
+        analysis_result = analyze_emotion(user_text)
+
+        # 4. LLM 서비스 호출 (말동이 응답 생성)
+        # maldongi_response_text -> maldong_response_text 변수명 변경
+        maldong_response_text = get_llm_response( 
+            user_text=user_text,
+            emotion=analysis_result["emotion"],
+            confidence=analysis_result["confidence"],
+            risk_score=analysis_result["risk_score"]
+        )
+        
+        # 5. DB에 대화 로그 저장 (Dialogue 테이블에 session_id와 함께 저장)
+        now = datetime.now()
+        
+        insert_dialogue_sql = """
+        INSERT INTO `Dialogue` 
+            (session_id, user_text, maldong_response, emotion, risk_score, timestamp) # DB 컬럼명 maldong_response로 가정
+        VALUES 
+            (%s, %s, %s, %s, %s, %s)
+        """
+        with conn.cursor() as cur:
+            cur.execute(
+                insert_dialogue_sql, 
+                (
+                    session_id, 
+                    user_text, 
+                    maldong_response_text, # 변수명 변경 반영
+                    analysis_result["emotion"], 
+                    analysis_result["risk_score"], 
+                    now
+                )
+            )
+            conn.commit()
+
+        # 6. TTS (Text-to-Speech) 수행 및 음성 바이트 생성
+        audio_content = await tts_synthesize_to_bytes(maldong_response_text) # 변수명 변경 반영
+        if audio_content is None:
+            # TTS 생성 실패 시
+             return Response(
+                content='{"error": "TTS 음성 파일 생성에 실패했습니다."}',
+                media_type="application/json",
+                status_code=500
+            )
+
+
+        # 7. 결과 반환: MP3 파일 스트림을 직접 반환
+        return Response(
+            content=audio_content,
+            media_type="audio/mp3",
+            headers={
+                "X-Maldong-Text": maldong_response_text,
+                 "X-User-STT-Text": user_text, # 헤더명 및 변수명 변경 반영
+                }
+        )
+        
+    except HTTPException:
+        conn.rollback() 
+        raise
+    except Exception as e:
+        conn.rollback()
+        # 기타 오류 처리 시 JSON으로 응답
+        return Response(
+            content=f'{{"error": "대화 처리 중 서버 오류 발생: {e}"}}',
+            media_type="application/json",
+            status_code=500
+        )
     finally:
         conn.close()
