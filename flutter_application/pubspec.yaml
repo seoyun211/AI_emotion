@@ -11,30 +11,31 @@ dependencies:
   flutter:
     sdk: flutter
   
+  # 한글 로케일 지원 추가
   flutter_localizations:
     sdk: flutter
 
-  http: ^1.2.0
-  dio: ^5.7.0
-
-  # 감정 분석을 위한 카메라/음성
+  fl_chart: ^0.66.0
+  # 🔹 카메라
   camera: ^0.11.3
-  record: ^6.1.2
-  path_provider: ^2.1.5
+
+  # 🔊 오디오 녹음 + 파일 저장 + 권한
+  record: ^6.1.2              # 최신 안정 버전
+  path_provider: ^2.1.5       # getApplicationDocumentsDirectory()용
   permission_handler: ^11.4.0
 
-  # 차트, UI
-  fl_chart: ^0.66.0
+  # 기본 패키지들
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
   provider: ^6.1.5
   shared_preferences: ^2.2.2
 
-  # 3D 모델
-  model_viewer_plus: ^1.9.3
+  # HTTP 통신
+  dio: ^5.7.0
+  http: ^1.6.0
 
-  # 🔊 말동이 음성 재생용
-  audioplayers: ^5.2.0
+  # 아바타 3D 표시용 패키지
+  model_viewer_plus: ^1.9.3
 
 dev_dependencies:
   flutter_test:
@@ -42,6 +43,7 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   flutter_launcher_icons: ^0.13.1
 
+# ✅ flutter_launcher_icons 설정 (한 번만!)
 flutter_icons:
   android: true
   ios: true
@@ -53,4 +55,5 @@ flutter:
   assets:
     - assets/background/
     - assets/icon/
+    - assets/avatar/
     - assets/model.glb

@@ -15,7 +15,7 @@ class MaldongAvatar extends StatelessWidget {
         src: url, // GLB 모델 경로
         autoPlay: true, // 모델 내 애니메이션 자동 재생
         autoRotate: false, // 회전 가능
-        cameraControls: false, // 터치/마우스로 회전/확대 가능
+        cameraControls: true, // 터치/마우스로 회전/확대 가능
       ),
     );
   }

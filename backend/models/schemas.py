@@ -1,7 +1,7 @@
 # backend/models/schemas.py
 from pydantic import BaseModel
 from datetime import date, datetime
-from typing import Optional, List, Dict
+from typing import Optional, List
 
 # -------------------------
 # A. 기본 입력 스키마 (Emotions, Dialogue 등에서 사용)
@@ -69,6 +69,7 @@ class SignUpRequest(BaseModel):
     user_phone: str
     linked_phone_input: Optional[str] = None
     ward_phone: Optional[str] = None
+    
 
 
 class TokenResponse(BaseModel):
@@ -131,73 +132,9 @@ class MultiModalEmotionRequest(BaseModel):
     image_base64: Optional[str] = None
 
 
-# ----- 6. 앙상블 상세 구조 (추가) ----- #
-class ModalityDetail(BaseModel):
-    """각 모달리티별(이미지/텍스트/음성) 감정 결과 상세"""
-    label: str               # "기쁨", "분노", "불안", "슬픔"
-    id: int                  # 0,1,2,3
-    probabilities: Dict[str, float]  # {"기쁨":0.7, "분노":0.1, ...}
-
-
-class EnsembleDetail(BaseModel):
-    """앙상블 최종 결과 + 모달리티별 결과"""
-    final: ModalityDetail
-    per_modality: Dict[str, ModalityDetail]  # {"image": {...}, "text": {...}, "audio": {...}}
-
-
 class MultiModalEmotionResponse(BaseModel):
-    emotion: str          # 최종 감정 라벨 (예: "기쁨")
-    confidence: float     # 최종 감정 확률 (예: 0.83)
+    emotion: str
+    confidence: float
     risk_score: float
     needs_alert: bool
     message: Optional[str] = None
-
-    ensemble_detail: Optional[EnsembleDetail] = None
-
-
-class DailyEmotionResponse(BaseModel):
-    date: str
-    emotion: str  # "0", "2", "3", "5"
-    emotion_name: str  # "기쁨", "분노", "불안", "슬픔"
-    severity: str
-    avg_risk_score: float
-
-
-# ------------------------------------------------
-# ⭐⭐⭐ 수정된 부분: 감정 4종 그대로 반환하는 구조
-# ------------------------------------------------
-class EmotionStatsResponse(BaseModel):
-    joy: int      # 기쁨
-    anger: int    # 분노
-    anxiety: int  # 불안
-    sadness: int  # 슬픔
-
-
-class WardInfoResponse(BaseModel):
-    user_id: int
-    username: str
-    user_phone: str
-
-
-# -------------------------
-# 7. 통화기록(Session) 스키마
-# -------------------------
-class SessionBase(BaseModel):
-    user_id: int
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    duration_seconds: Optional[int] = None
-
-
-class SessionCreate(SessionBase):
-    """통화 종료 시 기록 저장할 때 사용"""
-    pass
-
-
-class SessionResponse(SessionBase):
-    """통화기록 조회용"""
-    session_id: int
-
-
-class SessionListResponse(BaseModel):
-    sessions: List[SessionResponse]

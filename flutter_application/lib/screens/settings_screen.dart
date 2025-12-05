@@ -3,16 +3,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'font_size_screen.dart';
 import 'guardian_screen.dart';
 import 'profile_edit_screen.dart';
-import 'welcome_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback? onLogout;
+  final VoidCallback onLogout;
 
   const SettingsScreen({
     super.key,
     required this.onBack,
-    this.onLogout,
+    required this.onLogout,
   });
 
   Future<void> _handleLogout(BuildContext context) async {
@@ -78,25 +77,20 @@ class SettingsScreen extends StatelessWidget {
       await prefs.remove('access_token');
       await prefs.remove('user_role');
       await prefs.remove('user_id');
-      await prefs.remove('username');
       
-      if (!context.mounted) return;
-
       // 로그아웃 성공 메시지
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('로그아웃되었습니다'),
-          backgroundColor: Color(0xFFFF9800),
-          duration: Duration(seconds: 1),
-        ),
-      );
-
-      // onLogout 콜백 실행 (AppRoot의 _logout 메서드 호출)
-      // 이게 실행되면 AppRoot가 setState를 호출하고
-      // _currentScreen = AppScreen.welcome로 바뀌면서
-      // 자동으로 WelcomeScreen이 렌더링됨
-      if (onLogout != null) {
-        onLogout!();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('로그아웃되었습니다'),
+            backgroundColor: Color(0xFFFF9800),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // 약간의 딜레이 후 로그아웃 콜백 실행
+        await Future.delayed(const Duration(milliseconds: 300));
+        onLogout();
       }
     }
   }

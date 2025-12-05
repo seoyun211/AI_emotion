@@ -1,19 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'guardian_analysis_screen.dart';
 import 'guardian_settings_screen.dart';
 
 class GuardianHomeScreen extends StatefulWidget {
-  final int guardianUserId;
-  final String accessToken;
   final VoidCallback onOpenSettings;
   final VoidCallback onLogout;
 
   const GuardianHomeScreen({
     super.key,
-    required this.guardianUserId,
-    required this.accessToken,
     required this.onOpenSettings,
     required this.onLogout,
   });
@@ -23,194 +17,47 @@ class GuardianHomeScreen extends StatefulWidget {
 }
 
 class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
-  String elderlyName = '어르신';
+  String elderlyName = '어머니';
   int _selectedIndex = 0;
-  bool isLoading = true;
-  String? errorMessage;
-  
-  // API 기본 URL (실제 서버 주소로 변경 필요)
-  static const String baseUrl = 'http://localhost:8000';
-  
-  List<DailyEmotion> recentEmotions = [];
-  EmotionStats? emotionStats;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadGuardianData();
-  }
-
-  Future<void> _loadGuardianData() async {
-    try {
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
-      
-      // 1. 어르신 정보 가져오기
-      await _getWardInfo();
-      
-      // 2. 어르신 감정 데이터 가져오기
-      await _getWardEmotions();
-      
-      // 3. 감정 통계 가져오기
-      await _getEmotionStats();
-      
-      setState(() {
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = '데이터 로딩 실패: $e';
-      });
-      print('데이터 로딩 실패: $e');
-    }
-  }
-
-  Future<void> _getWardInfo() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/v1/guardian/ward-info/${widget.guardianUserId}'),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(utf8.decode(response.bodyBytes));
-        setState(() {
-          elderlyName = data['username'];
-        });
-      } else if (response.statusCode == 404) {
-        throw Exception('연동된 어르신을 찾을 수 없습니다');
-      } else {
-        throw Exception('어르신 정보 조회 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> _getWardEmotions() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/v1/guardian/ward-emotions/${widget.guardianUserId}?days=30'),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-        setState(() {
-          recentEmotions = data.map((item) => DailyEmotion.fromJson(item)).toList();
-        });
-      } else {
-        throw Exception('감정 데이터 조회 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> _getEmotionStats() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/api/v1/guardian/emotion-stats/${widget.guardianUserId}?days=30'),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-      );
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(utf8.decode(response.bodyBytes));
-        setState(() {
-          emotionStats = EmotionStats.fromJson(data);
-        });
-      } else {
-        throw Exception('통계 조회 실패: ${response.statusCode}');
-      }
-    } catch (e) {
-      rethrow;
-    }
-  }
+  // 샘플 데이터 (최근 30일)
+  final List<DailyEmotion> recentEmotions = [
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 0)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 1)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 2)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 3)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 4)), emotion: '부정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 5)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 6)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 7)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 8)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 9)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 10)), emotion: '부정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 11)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 12)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 13)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 14)), emotion: '심각'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 15)), emotion: '부정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 16)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 17)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 18)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 19)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 20)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 21)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 22)), emotion: '부정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 23)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 24)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 25)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 26)), emotion: '보통'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 27)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 28)), emotion: '긍정'),
+    DailyEmotion(date: DateTime.now().subtract(const Duration(days: 29)), emotion: '심각'),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFFFF8F0),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF66BB6A)),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                '데이터를 불러오는 중...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (errorMessage != null) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFFFF8F0),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                errorMessage!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadGuardianData,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF66BB6A),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                ),
-                child: const Text('다시 시도'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final stats = emotionStats ?? EmotionStats(positive: 0, normal: 0, negative: 0, serious: 0);
-    final todayEmotion = recentEmotions.isNotEmpty 
-        ? recentEmotions.first 
-        : DailyEmotion(
-            date: DateTime.now(),
-            emotion: '3',
-            emotionName: '불안',
-            severity: '보통',
-            riskScore: 0.0,
-          );
+    final stats = _calculateStats();
+    final todayEmotion = recentEmotions.first;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8F0),
@@ -218,39 +65,34 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
         child: Column(
           children: [
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadGuardianData,
-                color: const Color(0xFF66BB6A),
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Column(
-                          children: [
-                            // 오늘의 감정
-                            _buildTodayEmotionCard(todayEmotion),
-                            const SizedBox(height: 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                      child: Column(
+                        children: [
+                          // 오늘의 감정
+                          _buildTodayEmotionCard(todayEmotion),
+                          const SizedBox(height: 24),
 
-                            // 30일 감정 추이
-                            _buildEmotionTrendCard(),
-                            const SizedBox(height: 24),
+                          // 30일 감정 추이
+                          _buildEmotionTrendCard(),
+                          const SizedBox(height: 24),
 
-                            // 통계 요약
-                            _buildStatsCards(stats),
-                            const SizedBox(height: 24),
+                          // 통계 요약
+                          _buildStatsCards(stats),
+                          const SizedBox(height: 24),
 
-                            // 빠른 메뉴
-                            _buildQuickMenu(),
-                          ],
-                        ),
+                          // 빠른 메뉴
+                          _buildQuickMenu(),
+                        ],
                       ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
               ),
             ),
@@ -322,8 +164,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   }
 
   Widget _buildTodayEmotionCard(DailyEmotion todayEmotion) {
-    final color = _getEmotionColor(todayEmotion.severity);
-    final emoji = _getEmotionEmoji(todayEmotion.emotionName);
+    final color = _getEmotionColor(todayEmotion.emotion);
+    final emoji = _getEmotionEmoji(todayEmotion.emotion);
 
     return Container(
       width: double.infinity,
@@ -358,20 +200,11 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            todayEmotion.emotionName,
+            todayEmotion.emotion,
             style: const TextStyle(
               fontSize: 36,
               fontWeight: FontWeight.bold,
               color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            todayEmotion.severity,
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.white.withOpacity(0.9),
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -406,61 +239,49 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          recentEmotions.isEmpty
-              ? Container(
-                  height: 120,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '감정 데이터가 없습니다',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                )
-              : SizedBox(
-                  height: 120,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: recentEmotions.length,
-                    reverse: true,
-                    itemBuilder: (context, index) {
-                      final emotion = recentEmotions[index];
-                      final color = _getEmotionColor(emotion.severity);
-                      final day = emotion.date.day;
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: recentEmotions.length,
+              reverse: true,
+              itemBuilder: (context, index) {
+                final emotion = recentEmotions[index];
+                final color = _getEmotionColor(emotion.emotion);
+                final day = emotion.date.day;
 
-                      return Container(
-                        width: 32,
-                        margin: const EdgeInsets.only(right: 8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                width: 32,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(8),
-                                  ),
-                                ),
-                              ),
+                return Container(
+                  width: 32,
+                  margin: const EdgeInsets.only(right: 8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Container(
+                          width: 32,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '$day',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$day',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                );
+              },
+            ),
+          ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -706,8 +527,6 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => GuardianAnalysisScreen(
-                    guardianUserId: widget.guardianUserId,  // ✅ 추가
-                    accessToken: widget.accessToken,        // ✅ 추가
                     onOpenSettings: widget.onOpenSettings,
                   ),
                 ),
@@ -724,8 +543,6 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => GuardianSettingsScreen(
-                    guardianUserId: widget.guardianUserId,  // ✅ 추가
-                    accessToken: widget.accessToken,        // ✅ 추가
                     onBack: () => Navigator.pop(context),
                     onLogout: widget.onLogout,
                   ),
@@ -793,8 +610,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     );
   }
 
-  Color _getEmotionColor(String severity) {
-    switch (severity) {
+  Color _getEmotionColor(String emotion) {
+    switch (emotion) {
       case '긍정':
         return const Color(0xFF66BB6A);
       case '보통':
@@ -808,48 +625,58 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     }
   }
 
-  String _getEmotionEmoji(String emotionName) {
-    switch (emotionName) {
-      case '기쁨':
+  String _getEmotionEmoji(String emotion) {
+    switch (emotion) {
+      case '긍정':
         return '😊';
-      case '분노':
-        return '😠';
-      case '불안':
-        return '😰';
-      case '슬픔':
+      case '보통':
+        return '😐';
+      case '부정':
+        return '😕';
+      case '심각':
         return '😢';
       default:
         return '😐';
     }
   }
-}
 
-// ===== 데이터 모델 클래스 =====
+  EmotionStats _calculateStats() {
+    int positive = 0;
+    int normal = 0;
+    int negative = 0;
+    int serious = 0;
+
+    for (var emotion in recentEmotions) {
+      switch (emotion.emotion) {
+        case '긍정':
+          positive++;
+          break;
+        case '보통':
+          normal++;
+          break;
+        case '부정':
+          negative++;
+          break;
+        case '심각':
+          serious++;
+          break;
+      }
+    }
+
+    return EmotionStats(
+      positive: positive,
+      normal: normal,
+      negative: negative,
+      serious: serious,
+    );
+  }
+}
 
 class DailyEmotion {
   final DateTime date;
-  final String emotion;      // "0", "2", "3", "5"
-  final String emotionName;  // "기쁨", "분노", "불안", "슬픔"
-  final String severity;     // "긍정", "보통", "부정", "심각"
-  final double riskScore;
+  final String emotion;
 
-  DailyEmotion({
-    required this.date,
-    required this.emotion,
-    required this.emotionName,
-    required this.severity,
-    required this.riskScore,
-  });
-
-  factory DailyEmotion.fromJson(Map<String, dynamic> json) {
-    return DailyEmotion(
-      date: DateTime.parse(json['date']),
-      emotion: json['emotion'] ?? '3',
-      emotionName: json['emotion_name'] ?? '불안',
-      severity: json['severity'] ?? '보통',
-      riskScore: (json['avg_risk_score'] ?? 0.0).toDouble(),
-    );
-  }
+  DailyEmotion({required this.date, required this.emotion});
 }
 
 class EmotionStats {
@@ -864,13 +691,4 @@ class EmotionStats {
     required this.negative,
     required this.serious,
   });
-
-  factory EmotionStats.fromJson(Map<String, dynamic> json) {
-    return EmotionStats(
-      positive: json['positive'] ?? 0,
-      normal: json['normal'] ?? 0,
-      negative: json['negative'] ?? 0,
-      serious: json['serious'] ?? 0,
-    );
-  }
 }

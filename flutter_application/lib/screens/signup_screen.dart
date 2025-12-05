@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 const String baseUrl = 'http://localhost:8000';
 
@@ -25,7 +26,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-  final _linkedPhoneController = TextEditingController(); // 연동할 전화번호 (보호자용: 어르신 번호, 어르신용: 보호자 번호)
+  final _wardPhoneController = TextEditingController(); // 어르신 전화번호 (보호자용)
   
   String? _selectedRole; // 'ward' (어르신) or 'guardian' (보호자)
   String? _selectedGender; // 'M' or 'F'
@@ -38,7 +39,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _linkedPhoneController.dispose();
+    _wardPhoneController.dispose();
     super.dispose();
   }
 
@@ -97,23 +98,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    // 🌟 API 호출 - auth.py의 SignUpRequest 스키마와 일치
+    // 보호자인 경우 어르신 전화번호 확인
+    if (_selectedRole == 'guardian' && _wardPhoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('어르신 전화번호를 입력해주세요')),
+      );
+      return;
+    }
+
+    // API 호출
     final signupData = {
       'username': _usernameController.text,
       'password': _passwordController.text,
       'user_phone': _phoneController.text,
       'role': _selectedRole, // 'ward' or 'guardian'
       'gender': _selectedGender,
-      'birth_date': _selectedBirthDate!.toIso8601String().split('T')[0], // YYYY-MM-DD 형식
-      'address': _addressController.text.isEmpty ? null : _addressController.text,
-      
-      // 🔥 보호자인 경우: ward_phone (어르신 전화번호)
-      if (_selectedRole == 'guardian' && _linkedPhoneController.text.isNotEmpty)
-        'ward_phone': _linkedPhoneController.text,
-      
-      // 🔥 어르신인 경우: linked_phone_input (보호자 전화번호) - 선택사항
-      if (_selectedRole == 'ward' && _linkedPhoneController.text.isNotEmpty)
-        'linked_phone_input': _linkedPhoneController.text,
+      'birth_date': _selectedBirthDate!.toIso8601String().split('T')[0],
+      'address': _addressController.text,
+      if (_selectedRole == 'guardian') 'ward_phone': _wardPhoneController.text,
     };
     
     print('회원가입 데이터: $signupData');
@@ -122,17 +124,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final url = Uri.parse('$baseUrl/api/v1/auth/signup');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json; charset=utf-8'},
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode(signupData),
       );
 
-      print('응답 상태 코드: ${response.statusCode}');
-      print('응답 본문: ${utf8.decode(response.bodyBytes)}');
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         // 회원가입 성공
-        final responseData = jsonDecode(utf8.decode(response.bodyBytes));
-        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -158,26 +155,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
       } else {
         String message = '회원가입에 실패했습니다.';
         try {
-          final err = jsonDecode(utf8.decode(response.bodyBytes));
+          final err = jsonDecode(response.body);
           if (err['detail'] != null) {
-            message = err['detail'].toString();
+            message = err['detail'];
           }
         } catch (_) {}
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(message)),
         );
       }
     } catch (e) {
-      print('네트워크 에러: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('네트워크 오류: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('네트워크 오류: $e')),
       );
     }
   }
@@ -301,16 +291,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
               const SizedBox(height: 16),
 
-              // 🌟 보호자 선택 시: 어르신 전화번호 입력 (필수)
+              // 보호자 선택 시 어르신 전화번호 입력
               if (_selectedRole == 'guardian') ...[
                 TextFormField(
-                  controller: _linkedPhoneController,
+                  controller: _wardPhoneController,
                   keyboardType: TextInputType.phone,
                   decoration: InputDecoration(
                     labelText: '어르신 전화번호',
                     prefixIcon: Icon(Icons.elderly, color: primaryColor),
                     hintText: '010-1234-5678',
-                    helperText: '연동할 어르신의 전화번호를 입력해주세요 (필수)',
+                    helperText: '연동할 어르신의 전화번호를 입력해주세요',
                     helperStyle: TextStyle(
                       color: primaryColor.withOpacity(0.7),
                       fontSize: 12,
@@ -329,32 +319,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // 🌟 어르신 선택 시: 보호자 전화번호 입력 (선택사항)
-              if (_selectedRole == 'ward') ...[
-                TextFormField(
-                  controller: _linkedPhoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: '보호자 전화번호 (선택사항)',
-                    prefixIcon: Icon(Icons.family_restroom, color: primaryColor),
-                    hintText: '010-1234-5678',
-                    helperText: '보호자 계정과 연동하려면 입력해주세요',
-                    helperStyle: TextStyle(
-                      color: primaryColor.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -505,8 +469,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       onTap: () {
         setState(() {
           _selectedRole = role;
-          // 역할 변경 시 연동 전화번호 초기화
-          _linkedPhoneController.clear();
         });
       },
       borderRadius: BorderRadius.circular(12),

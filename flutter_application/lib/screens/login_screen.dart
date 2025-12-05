@@ -12,7 +12,7 @@ const String baseUrl = 'http://localhost:8000';
 // 로그인 화면
 // ============================================
 class LoginScreen extends StatefulWidget {
-  final Function(Map<String, dynamic>)? onLoginSuccess;
+  final Function(String role)? onLoginSuccess;
 
   const LoginScreen({
     Key? key,
@@ -28,7 +28,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -39,8 +38,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
 
     // POST /api/auth/login 에 보낼 데이터
     final loginData = {
@@ -53,56 +50,45 @@ class _LoginScreenState extends State<LoginScreen> {
       final url = Uri.parse('$baseUrl/api/v1/auth/login');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json; charset=utf-8'},
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode(loginData),
       );
 
-      setState(() => _isLoading = false);
-
       // 2) 응답 상태 코드 체크
       if (response.statusCode == 200) {
-        // 예: { "user_id": 123, "role": "ward", "username": "홍길동", "access_token": "...", "token_type": "bearer" }
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        // 예: { "user_id": 123, "role": "ward", "username": "홍길동", "token": "..." }
+        final data = jsonDecode(response.body);
 
-        final role = data['role'];                    // 'ward' or 'guardian'
+        final role = data['role'];      // 'ward' or 'guardian'
         final username = data['username'] ?? '사용자';
         final userId = data['user_id'];
-        final accessToken = data['access_token'];     // ✅ JWT 토큰
-
-        print('로그인 성공: userId=$userId, role=$role, username=$username');
+        final token = data['token'];
 
         // SharedPreferences에 저장
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', accessToken ?? '');
+        await prefs.setString('access_token', token ?? '');
         await prefs.setString('user_role', role);
         await prefs.setInt('user_id', userId ?? 0);
         await prefs.setString('username', username);
 
         // 3) 성공 알림
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('로그인 성공! $username님 환영합니다 🎉'),
-              backgroundColor: const Color(0xFF66BB6A),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('로그인 성공! $username님 환영합니다 🎉'),
+            backgroundColor: const Color(0xFF66BB6A),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // 4) 콜백이 있으면 호출
+        if (widget.onLoginSuccess != null) {
+          widget.onLoginSuccess!(role);
         }
 
-        // 4) 콜백이 있으면 호출 (main.dart의 _handleLoginSuccess)
-        if (widget.onLoginSuccess != null) {
-          widget.onLoginSuccess!({
-            'user_id': userId,
-            'access_token': accessToken,
-            'role': role,
-            'username': username,
-          });
-        } else {
-          // 5) 콜백이 없으면 직접 화면 전환
-          await Future.delayed(const Duration(milliseconds: 500));
-          
-          if (!mounted) return;
-          
+        // 5) 화면 전환
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (mounted) {
           if (role == 'ward') {
             // 어르신 홈 화면으로 이동
             Navigator.pushReplacement(
@@ -110,24 +96,25 @@ class _LoginScreenState extends State<LoginScreen> {
               MaterialPageRoute(
                 builder: (context) => HomeScreen(
                   onStartCall: () {
+                    // 화상 통화 시작 로직
                     print('화상 통화 시작');
                   },
                   avatar: const MaldongAvatar(url: 'assets/model.glb'),
                   onOpenSettings: () {
+                    // 설정 열기 로직
                     print('설정 열기');
                   },
                 ),
               ),
             );
           } else if (role == 'guardian') {
-            // ✅ 보호자 홈 화면으로 이동 (필수 파라미터 전달)
+            // 보호자 홈 화면으로 이동
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => GuardianHomeScreen(
-                  guardianUserId: userId,        // ✅ 필수
-                  accessToken: accessToken,      // ✅ 필수
                   onOpenSettings: () {
+                    // 설정 열기 로직
                     print('설정 열기');
                   },
                   onLogout: () async {
@@ -148,34 +135,21 @@ class _LoginScreenState extends State<LoginScreen> {
         // 5) 200 아니면 에러 처리
         String message = '로그인에 실패했습니다.';
         try {
-          final err = jsonDecode(utf8.decode(response.bodyBytes));
+          final err = jsonDecode(response.body);
           if (err['detail'] != null) {
             message = err['detail'];
           }
         } catch (_) {}
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       // 6) 네트워크 오류 등
-      setState(() => _isLoading = false);
-      print('로그인 에러: $e');
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('네트워크 오류: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('네트워크 오류: $e')),
+      );
     }
   }
 
@@ -231,7 +205,6 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                enabled: !_isLoading,
                 decoration: InputDecoration(
                   labelText: '전화번호',
                   prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF66BB6A)),
@@ -258,7 +231,6 @@ class _LoginScreenState extends State<LoginScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: !_isPasswordVisible,
-                enabled: !_isLoading,
                 decoration: InputDecoration(
                   labelText: '비밀번호',
                   prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF66BB6A)),
@@ -287,7 +259,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   }
                   return null;
                 },
-                onFieldSubmitted: (_) => _handleLogin(),
               ),
 
               const SizedBox(height: 32),
@@ -297,32 +268,22 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleLogin,
+                  onPressed: _handleLogin,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF66BB6A),
-                    disabledBackgroundColor: Colors.grey,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                     elevation: 2,
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          '로그인',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                  child: const Text(
+                    '로그인',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
               ),
 
@@ -331,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // 회원가입 링크
               Center(
                 child: TextButton(
-                  onPressed: _isLoading ? null : () {
+                  onPressed: () {
                     Navigator.pop(context); // WelcomeScreen으로 돌아가서 회원가입 선택
                   },
                   child: const Text(

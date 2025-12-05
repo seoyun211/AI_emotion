@@ -1,73 +1,50 @@
-# backend/models/emotion_analyzer.py
+# models/emotion_analyzer.py (최종 단일 코드)
+from typing import Dict
 
-from __future__ import annotations
-from typing import Any, Dict, List, Optional
-
-from .ensemble_model import EnsembleEmotionModel
-from .clients.face_client import predict_face_probs_from_frames
-from .clients.voice_client import predict_voice_probs
-from .clients.text_client import predict_text_probs
-
-
-# 기본 가중치: 이미지 0.6, 텍스트 0.2, 음성 0.2
-ensemble_model = EnsembleEmotionModel(
-    w_img=0.6,
-    w_text=0.2,
-    w_audio=0.2,
-)
-
-
-def _default_probs() -> list[float]:
-    return [0.25, 0.25, 0.25, 0.25]
-
-
-def analyze_multimodal_emotion(
-    image_frames: Optional[List[bytes]],
-    text: Optional[str],
-    wav_path: Optional[str],
-) -> Dict[str, Any]:
-    """
-    - image_frames: 프레임 bytes 리스트 (0~N장)
-    - text       : STT 결과 또는 사용자가 입력한 텍스트
-    - wav_path   : 임시 저장된 wav 파일 경로 (없으면 None)
-
-    각각 모달리티가 None/빈값이면 → 균일분포 사용.
-    """
-
-    # 1) 이미지
-    if image_frames:
-        try:
-            p_img = predict_face_probs_from_frames(image_frames)
-        except Exception as e:
-            print(f"[EMOTION_ANALYZER] 이미지 모델 오류: {e}")
-            p_img = _default_probs()
+# 🧠 기본 감정 분석 (키워드 기반 Mock 로직 사용)
+def analyze_emotion(text: str) -> Dict:
+    """텍스트 기반 감정 분석 (Mock 키워드 분석)"""
+    text_lower = text.lower()
+    
+    # 감정 키워드 분석
+    positive_keywords = ["기뻐", "좋아", "행복", "즐거워", "감사", "사랑", "기쁘", "신나"]
+    negative_keywords = ["슬퍼", "우울", "화나", "분노", "불안", "힘들어", "외로워", "짜증", "속상"]
+    anxiety_keywords = ["불안", "걱정", "무서워", "두려워", "긴장"]
+    anger_keywords = ["화나", "분노", "짜증", "열받", "화남"]
+    
+    positive_count = sum(1 for keyword in positive_keywords if keyword in text_lower)
+    negative_count = sum(1 for keyword in negative_keywords if keyword in text_lower)
+    anxiety_count = sum(1 for keyword in anxiety_keywords if keyword in text_lower)
+    anger_count = sum(1 for keyword in anger_keywords if keyword in text_lower)
+    
+    # 감정 판별
+    if anger_count > 0:
+        emotion = "분노"
+        confidence = min(0.7 + (anger_count * 0.1), 0.95)
+        risk_score = min(0.8 + (anger_count * 0.05), 0.95)
+    elif anxiety_count > 0:
+        emotion = "불안"
+        confidence = min(0.65 + (anxiety_count * 0.1), 0.9)
+        risk_score = min(0.7 + (anxiety_count * 0.05), 0.9)
+    elif negative_count > positive_count:
+        emotion = "슬픔"
+        confidence = min(0.6 + (negative_count * 0.08), 0.85)
+        risk_score = min(0.75 + (negative_count * 0.03), 0.9)
+    elif positive_count > negative_count:
+        emotion = "기쁨"
+        confidence = min(0.7 + (positive_count * 0.08), 0.9)
+        risk_score = max(0.1 - (positive_count * 0.02), 0.05)
     else:
-        p_img = _default_probs()
-
-    # 2) 텍스트
-    if text and text.strip():
-        try:
-            p_text = predict_text_probs(text)
-        except Exception as e:
-            print(f"[EMOTION_ANALYZER] 텍스트 모델 오류: {e}")
-            p_text = _default_probs()
-    else:
-        p_text = _default_probs()
-
-    # 3) 음성
-    if wav_path:
-        try:
-            p_audio = predict_voice_probs(wav_path)
-        except Exception as e:
-            print(f"[EMOTION_ANALYZER] 음성 모델 오류: {e}")
-            p_audio = _default_probs()
-    else:
-        p_audio = _default_probs()
-
-    # 4) 앙상블 결합
-    result = ensemble_model.predict(
-        image_probs=p_img,
-        text_probs=p_text,
-        audio_probs=p_audio,
-    )
-    return result
+        emotion = "중립"
+        confidence = 0.5
+        risk_score = 0.3
+    
+    needs_alert = risk_score > 0.7
+    
+    return {
+        "emotion": emotion,
+        "confidence": round(confidence, 3),
+        "risk_score": round(risk_score, 3),
+        "needs_alert": needs_alert,
+        "model": "basic"  # 🚨 emotion_service의 통합 로직을 위해 필수 추가
+    }
