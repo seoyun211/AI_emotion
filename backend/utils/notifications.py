@@ -7,3 +7,4 @@ def send_push_notification(user_id: int, title: str, message: str, alert_type: s
     """
     print(f"[알림] 사용자 {user_id} → {title}: {message} ({alert_type})")
     # TODO: 실제 푸시 알림 API 연동
+    

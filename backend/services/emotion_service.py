@@ -1,15 +1,12 @@
 # backend/services/emotion_service.py
 
 from __future__ import annotations
-
 import uuid
 import asyncio
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, List
-
 from fastapi import HTTPException
-
 from models.emotion_analyzer import analyze_multimodal_emotion
 from database.session import get_db_connection
 

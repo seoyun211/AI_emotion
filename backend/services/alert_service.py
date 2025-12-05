@@ -1,8 +1,8 @@
 # backend/services/alert_service.py
-
+'''
 from sqlalchemy.orm import Session
-from backend.models import Alert, GuardianRelationship, User
-from backend.utils.notifications import send_push_notification
+from models import Alert, GuardianRelationship, User
+from utils.notifications import send_push_notification
 
 def create_alert(db: Session, user_id: int, chunk_id: int, alert_type: str, status: str = "pending"):
     alert = Alert(
@@ -26,3 +26,4 @@ def create_alert(db: Session, user_id: int, chunk_id: int, alert_type: str, stat
         )
 
     return alert
+    '''
