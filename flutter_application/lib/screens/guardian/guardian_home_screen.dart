@@ -28,7 +28,6 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   bool isLoading = true;
   String? errorMessage;
   
-  // API 기본 URL (실제 서버 주소로 변경 필요)
   static const String baseUrl = 'http://localhost:8000';
   
   List<DailyEmotion> recentEmotions = [];
@@ -47,13 +46,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
         errorMessage = null;
       });
       
-      // 1. 어르신 정보 가져오기
       await _getWardInfo();
-      
-      // 2. 어르신 감정 데이터 가져오기
       await _getWardEmotions();
-      
-      // 3. 감정 통계 가져오기
       await _getEmotionStats();
       
       setState(() {
@@ -201,14 +195,12 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
       );
     }
 
-    final stats = emotionStats ?? EmotionStats(positive: 0, normal: 0, negative: 0, serious: 0);
+    final stats = emotionStats ?? EmotionStats(joy: 0, anger: 0, anxiety: 0, sadness: 0);
     final todayEmotion = recentEmotions.isNotEmpty 
         ? recentEmotions.first 
         : DailyEmotion(
             date: DateTime.now(),
-            emotion: '3',
             emotionName: '불안',
-            severity: '보통',
             riskScore: 0.0,
           );
 
@@ -231,19 +223,12 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 24.0),
                         child: Column(
                           children: [
-                            // 오늘의 감정
                             _buildTodayEmotionCard(todayEmotion),
                             const SizedBox(height: 24),
-
-                            // 30일 감정 추이
                             _buildEmotionTrendCard(),
                             const SizedBox(height: 24),
-
-                            // 통계 요약
                             _buildStatsCards(stats),
                             const SizedBox(height: 24),
-
-                            // 빠른 메뉴
                             _buildQuickMenu(),
                           ],
                         ),
@@ -322,7 +307,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   }
 
   Widget _buildTodayEmotionCard(DailyEmotion todayEmotion) {
-    final color = _getEmotionColor(todayEmotion.severity);
+    final color = _getEmotionColor(todayEmotion.emotionName);
     final emoji = _getEmotionEmoji(todayEmotion.emotionName);
 
     return Container(
@@ -363,15 +348,6 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
               fontSize: 36,
               fontWeight: FontWeight.bold,
               color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            todayEmotion.severity,
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.white.withOpacity(0.9),
-              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -426,7 +402,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                     reverse: true,
                     itemBuilder: (context, index) {
                       final emotion = recentEmotions[index];
-                      final color = _getEmotionColor(emotion.severity);
+                      final color = _getEmotionColor(emotion.emotionName);
                       final day = emotion.date.day;
 
                       return Container(
@@ -465,10 +441,10 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildLegend('긍정', const Color(0xFF66BB6A)),
-              _buildLegend('보통', const Color(0xFFFFB74D)),
-              _buildLegend('부정', const Color(0xFF64B5F6)),
-              _buildLegend('심각', const Color(0xFFEF5350)),
+              _buildLegend('기쁨', const Color(0xFF66BB6A)),
+              _buildLegend('분노', const Color(0xFFEF5350)),
+              _buildLegend('불안', const Color(0xFF64B5F6)),
+              _buildLegend('슬픔', const Color(0xFF9575CD)),
             ],
           ),
         ],
@@ -483,19 +459,19 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
           children: [
             Expanded(
               child: _buildStatCard(
-                '긍정',
-                stats.positive,
+                '기쁨',
+                stats.joy,
                 const Color(0xFF66BB6A),
-                Icons.sentiment_very_satisfied,
+                '😊',
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                '보통',
-                stats.normal,
-                const Color(0xFFFFB74D),
-                Icons.sentiment_satisfied,
+                '분노',
+                stats.anger,
+                const Color(0xFFEF5350),
+                '😡',
               ),
             ),
           ],
@@ -505,19 +481,19 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
           children: [
             Expanded(
               child: _buildStatCard(
-                '부정',
-                stats.negative,
+                '불안',
+                stats.anxiety,
                 const Color(0xFF64B5F6),
-                Icons.sentiment_dissatisfied,
+                '😟',
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                '심각',
-                stats.serious,
-                const Color(0xFFEF5350),
-                Icons.sentiment_very_dissatisfied,
+                '슬픔',
+                stats.sadness,
+                const Color(0xFF9575CD),
+                '😢',
               ),
             ),
           ],
@@ -526,7 +502,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     );
   }
 
-  Widget _buildStatCard(String label, int count, Color color, IconData icon) {
+  Widget _buildStatCard(String label, int count, Color color, String emoji) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -546,7 +522,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 32),
+          Text(emoji, style: const TextStyle(fontSize: 32)),
           const SizedBox(height: 8),
           Text(
             label,
@@ -706,8 +682,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => GuardianAnalysisScreen(
-                    guardianUserId: widget.guardianUserId,  // ✅ 추가
-                    accessToken: widget.accessToken,        // ✅ 추가
+                    guardianUserId: widget.guardianUserId,
+                    accessToken: widget.accessToken,
                     onOpenSettings: widget.onOpenSettings,
                   ),
                 ),
@@ -724,8 +700,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => GuardianSettingsScreen(
-                    guardianUserId: widget.guardianUserId,  // ✅ 추가
-                    accessToken: widget.accessToken,        // ✅ 추가
+                    guardianUserId: widget.guardianUserId,
+                    accessToken: widget.accessToken,
                     onBack: () => Navigator.pop(context),
                     onLogout: widget.onLogout,
                   ),
@@ -793,16 +769,16 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     );
   }
 
-  Color _getEmotionColor(String severity) {
-    switch (severity) {
-      case '긍정':
+  Color _getEmotionColor(String emotionName) {
+    switch (emotionName) {
+      case '기쁨':
         return const Color(0xFF66BB6A);
-      case '보통':
-        return const Color(0xFFFFB74D);
-      case '부정':
-        return const Color(0xFF64B5F6);
-      case '심각':
+      case '분노':
         return const Color(0xFFEF5350);
+      case '불안':
+        return const Color(0xFF64B5F6);
+      case '슬픔':
+        return const Color(0xFF9575CD);
       default:
         return Colors.grey;
     }
@@ -813,9 +789,9 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
       case '기쁨':
         return '😊';
       case '분노':
-        return '😠';
+        return '😡';
       case '불안':
-        return '😰';
+        return '😟';
       case '슬픔':
         return '😢';
       default:
@@ -828,49 +804,43 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
 
 class DailyEmotion {
   final DateTime date;
-  final String emotion;      // "0", "2", "3", "5"
   final String emotionName;  // "기쁨", "분노", "불안", "슬픔"
-  final String severity;     // "긍정", "보통", "부정", "심각"
   final double riskScore;
 
   DailyEmotion({
     required this.date,
-    required this.emotion,
     required this.emotionName,
-    required this.severity,
     required this.riskScore,
   });
 
   factory DailyEmotion.fromJson(Map<String, dynamic> json) {
     return DailyEmotion(
       date: DateTime.parse(json['date']),
-      emotion: json['emotion'] ?? '3',
       emotionName: json['emotion_name'] ?? '불안',
-      severity: json['severity'] ?? '보통',
       riskScore: (json['avg_risk_score'] ?? 0.0).toDouble(),
     );
   }
 }
 
 class EmotionStats {
-  final int positive;
-  final int normal;
-  final int negative;
-  final int serious;
+  final int joy;      // 기쁨
+  final int anger;    // 분노
+  final int anxiety;  // 불안
+  final int sadness;  // 슬픔
 
   EmotionStats({
-    required this.positive,
-    required this.normal,
-    required this.negative,
-    required this.serious,
+    required this.joy,
+    required this.anger,
+    required this.anxiety,
+    required this.sadness,
   });
 
   factory EmotionStats.fromJson(Map<String, dynamic> json) {
     return EmotionStats(
-      positive: json['positive'] ?? 0,
-      normal: json['normal'] ?? 0,
-      negative: json['negative'] ?? 0,
-      serious: json['serious'] ?? 0,
+      joy: json['joy'] ?? 0,
+      anger: json['anger'] ?? 0,
+      anxiety: json['anxiety'] ?? 0,
+      sadness: json['sadness'] ?? 0,
     );
   }
 }

@@ -2,15 +2,13 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart'; // 어르신 홈 화면
-import 'guardian/guardian_home_screen.dart'; // 보호자 홈 화면
-import '../maldong_avatar.dart'; // 아바타
+import 'home_screen.dart';
+import 'guardian/guardian_home_screen.dart';
+import '../maldong_avatar.dart';
+import 'signup_screen.dart';
 
 const String baseUrl = 'http://localhost:8000';
 
-// ============================================
-// 로그인 화면
-// ============================================
 class LoginScreen extends StatefulWidget {
   final Function(Map<String, dynamic>)? onLoginSuccess;
 
@@ -42,14 +40,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    // POST /api/auth/login 에 보낼 데이터
     final loginData = {
       'user_phone': _phoneController.text,
       'password': _passwordController.text,
     };
 
     try {
-      // 1) 로그인 API 호출
       final url = Uri.parse('$baseUrl/api/v1/auth/login');
       final response = await http.post(
         url,
@@ -59,26 +55,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() => _isLoading = false);
 
-      // 2) 응답 상태 코드 체크
       if (response.statusCode == 200) {
-        // 예: { "user_id": 123, "role": "ward", "username": "홍길동", "access_token": "...", "token_type": "bearer" }
         final data = jsonDecode(utf8.decode(response.bodyBytes));
 
-        final role = data['role'];                    // 'ward' or 'guardian'
+        final role = data['role'];
         final username = data['username'] ?? '사용자';
         final userId = data['user_id'];
-        final accessToken = data['access_token'];     // ✅ JWT 토큰
+        final accessToken = data['access_token'];
 
         print('로그인 성공: userId=$userId, role=$role, username=$username');
 
-        // SharedPreferences에 저장
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('access_token', accessToken ?? '');
         await prefs.setString('user_role', role);
         await prefs.setInt('user_id', userId ?? 0);
         await prefs.setString('username', username);
 
-        // 3) 성공 알림
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -89,22 +81,21 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
 
-        // 4) 콜백이 있으면 호출 (main.dart의 _handleLoginSuccess)
         if (widget.onLoginSuccess != null) {
-          widget.onLoginSuccess!({
-            'user_id': userId,
-            'access_token': accessToken,
-            'role': role,
-            'username': username,
-          });
+          widget.onLoginSuccess!(
+            {
+              'user_id': userId,
+              'access_token': accessToken,
+              'role': role,
+              'username': username,
+            },
+          );
         } else {
-          // 5) 콜백이 없으면 직접 화면 전환
           await Future.delayed(const Duration(milliseconds: 500));
-          
+
           if (!mounted) return;
-          
+
           if (role == 'ward') {
-            // 어르신 홈 화면으로 이동
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
@@ -120,21 +111,19 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             );
           } else if (role == 'guardian') {
-            // ✅ 보호자 홈 화면으로 이동 (필수 파라미터 전달)
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
                 builder: (context) => GuardianHomeScreen(
-                  guardianUserId: userId,        // ✅ 필수
-                  accessToken: accessToken,      // ✅ 필수
+                  guardianUserId: userId,
+                  accessToken: accessToken,
                   onOpenSettings: () {
                     print('설정 열기');
                   },
                   onLogout: () async {
-                    // 로그아웃 처리
                     final prefs = await SharedPreferences.getInstance();
                     await prefs.clear();
-                    
+
                     if (context.mounted) {
                       Navigator.pushReplacementNamed(context, '/');
                     }
@@ -145,7 +134,6 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       } else {
-        // 5) 200 아니면 에러 처리
         String message = '로그인에 실패했습니다.';
         try {
           final err = jsonDecode(utf8.decode(response.bodyBytes));
@@ -164,10 +152,9 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
     } catch (e) {
-      // 6) 네트워크 오류 등
       setState(() => _isLoading = false);
       print('로그인 에러: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -207,7 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 32),
 
-              // 환영 메시지
               const Text(
                 '다시 만나서 반가워요!',
                 style: TextStyle(
@@ -227,7 +213,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 48),
 
-              // 전화번호
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -254,7 +239,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 16),
 
-              // 비밀번호
               TextFormField(
                 controller: _passwordController,
                 obscureText: !_isPasswordVisible,
@@ -292,7 +276,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 32),
 
-              // 로그인 버튼
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -328,12 +311,39 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 16),
 
-              // 회원가입 링크
+              // ✅ 회원가입 버튼 - SignUpScreen의 생성자에 맞게 수정
               Center(
                 child: TextButton(
-                  onPressed: _isLoading ? null : () {
-                    Navigator.pop(context); // WelcomeScreen으로 돌아가서 회원가입 선택
-                  },
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SignUpScreen(
+                                onSignUpSuccess: (String role) {
+                                  // 회원가입 성공 후 로그인 화면으로 돌아왔을 때
+                                  print('회원가입 완료: role=$role');
+                                  
+                                  // 회원가입 성공 메시지 표시
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        role == 'ward' 
+                                            ? '어르신 계정 생성 완료! 로그인해주세요 😊'
+                                            : '보호자 계정 생성 완료! 로그인해주세요 😊'
+                                      ),
+                                      backgroundColor: role == 'ward'
+                                          ? const Color(0xFFFF9800)
+                                          : const Color(0xFF66BB6A),
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
                   child: const Text(
                     '계정이 없으신가요? 회원가입',
                     style: TextStyle(
