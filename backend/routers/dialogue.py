@@ -85,13 +85,16 @@ async def handle_user_speech(
         ensemble_detail=ensemble_detail,
     )
 
-
     # 6) TTS 합성
     tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
     if tts_audio_bytes is None:
         raise HTTPException(status_code=500, detail="TTS 합성 실패")
 
+    print(f"[TTS] length = {len(tts_audio_bytes)} bytes")  # ← 이 줄 추가
+
     tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8")
+    print(f"[TTS] base64 length = {len(tts_b64)}")         # ← 이 줄 추가
+
 
     # 7) Flutter로 응답
     return JSONResponse(
