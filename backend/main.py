@@ -8,7 +8,6 @@ load_dotenv()
 
 from database.session import get_db_connection
 from routers.dialogue import router as dialogue_router
-from routers.alerts import router as alerts_router
 from routers.users import router as users_router
 from routers.auth import router as auth_router
 from routers.guardian import router as guardian_router
@@ -32,7 +31,7 @@ app.add_middleware(
 # ✅ 라우터 포함
 #  - /api/v1/dialogue/speak : 영상통화 + 감정 + LLM + TTS
 app.include_router(dialogue_router)
-app.include_router(alerts_router)
+#app.include_router(alerts_router)
 app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(guardian_router)
