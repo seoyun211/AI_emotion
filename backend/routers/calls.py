@@ -1,19 +1,17 @@
-# routers/calls.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from services.emotion_service import process_emotion_analysis
-#from services.alert_service import create_alert
-from routers.analyses import save_analysis
 from database.session import get_db_connection
 
 router = APIRouter(prefix="/api/v1/calls", tags=["통화 기록"])
 
+# -------------------------
+# 📦 Pydantic 모델 (응답/요청 스키마)
+# -------------------------
 
 class CallStartRequest(BaseModel):
     user_id: int  # 통화 주체 회원 ID
-
 
 class CallResponse(BaseModel):
     session_id: int
@@ -22,10 +20,12 @@ class CallResponse(BaseModel):
     end_time: Optional[datetime] = None
     duration_seconds: Optional[int] = None
 
-
 class CallListResponse(BaseModel):
     calls: List[CallResponse]
 
+# -------------------------
+# 🚀 API 엔드포인트
+# -------------------------
 
 @router.post("/start", response_model=CallResponse)
 def start_call(data: CallStartRequest):
@@ -53,26 +53,25 @@ def start_call(data: CallStartRequest):
         )
 
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise HTTPException(status_code=500, detail=f"통화 시작 기록 실패: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 @router.post("/{session_id}/end", response_model=CallResponse)
 def end_call(session_id: int):
     """
-    통화 종료 기록 + 통화지속시간 계산 + 감정 분석 + 위험 알림
+    통화 종료 기록 및 정보 업데이트
     """
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            # 1. 기존 통화 정보 조회
             cur.execute(
-                """
-                SELECT user_id, start_time, end_time
-                FROM `Session`
-                WHERE session_id = %s
-                """,  # ✅ Session_id → session_id (컬럼명 소문자)
+                "SELECT user_id, start_time, end_time FROM `Session` WHERE session_id = %s",
                 (session_id,),
             )
             row = cur.fetchone()
@@ -83,52 +82,40 @@ def end_call(session_id: int):
             if row["end_time"] is not None:
                 raise HTTPException(status_code=400, detail="이미 종료된 통화입니다.")
 
+            # 2. 종료 시간 및 지속 시간 계산
             start_time = row["start_time"]
             end_time = datetime.now()
             duration = int((end_time - start_time).total_seconds())
 
-            update_sql = """
-            UPDATE `Session`
-            SET end_time = %s, duration_seconds = %s
-            WHERE session_id = %s
-            """
+            # 3. DB 업데이트
+            update_sql = "UPDATE `Session` SET end_time = %s, duration_seconds = %s WHERE session_id = %s"
             cur.execute(update_sql, (end_time, duration, session_id))
             conn.commit()
-        '''
-        # ✅ 1. 감정 분석 실행 (영상 파일 경로는 실제 저장 위치에 맞게 수정)
-        video_path = f"temp_uploads/{session_id}.mp4"
-        result = analyze_video_pipeline(video_path)
 
-        # ✅ 2. 분석 결과 저장 (AnalysisChunk)
-        chunk_id = save_analysis(session_id, row["user_id"], result)
-
-        # ✅ 3. 위험 감정 감지 시 알림 생성
-        if result["risk_score"] >= 0.7:
-            create_alert(user_id=row["user_id"], chunk_id=result.get("chunk_id"), alert_type="High_RiskScore")
-        
-        return CallResponse(
-            session_id=session_id,
-            user_id=row["user_id"],
-            start_time=start_time,
-            end_time=end_time,
-            duration_seconds=duration,
-        )'''
+            # 4. 정상 응답 반환 (FastAPI가 모델에 맞춰 변환)
+            return CallResponse(
+                session_id=session_id,
+                user_id=row["user_id"],
+                start_time=start_time,
+                end_time=end_time,
+                duration_seconds=duration,
+            )
 
     except HTTPException:
-        # 위에서 이미 적절한 상태코드로 던진 것들은 그대로 다시 raise
         raise
     except Exception as e:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         raise HTTPException(status_code=500, detail=f"통화 종료 기록 실패: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 
 @router.get("/user/{user_id}", response_model=CallListResponse)
 def get_call_history_by_user(user_id: int):
     """
     특정 유저의 통화 기록 전체 조회 (최근 순)
-    Flutter 통화기록 화면에서 사용하는 API
     """
     conn = get_db_connection()
     try:
@@ -142,9 +129,9 @@ def get_call_history_by_user(user_id: int):
             cur.execute(sql, (user_id,))
             rows = cur.fetchall()
 
-        calls: List[CallResponse] = []
+        calls_list = []
         for row in rows:
-            calls.append(
+            calls_list.append(
                 CallResponse(
                     session_id=row["session_id"],
                     user_id=row["user_id"],
@@ -154,9 +141,10 @@ def get_call_history_by_user(user_id: int):
                 )
             )
 
-        return CallListResponse(calls=calls)
+        return CallListResponse(calls=calls_list)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"통화 기록 조회 실패: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()

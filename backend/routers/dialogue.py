@@ -52,6 +52,7 @@ async def handle_user_speech(
             user_text = ""
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"STT 처리 실패: {e}")
+    print(f"🎤 [STT 인식 결과]: {user_text}")
 
     if not user_text.strip():
         user_text = "..."  # 최소 기본값
@@ -84,6 +85,7 @@ async def handle_user_speech(
         risk_score=risk_score,
         ensemble_detail=ensemble_detail,
     )
+    print(f"🤖 [AI 답변]: {llm_reply}")
 
     # 6) TTS 합성
     tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
