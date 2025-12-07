@@ -4,8 +4,6 @@ from datetime import datetime
 import asyncio
 from database.session import get_db_connection
 from routers.dialogue import router as dialogue_router
-from routers.alerts import router as alerts_router
-from routers.emotions import router as emotions_router
 from routers.users import router as users_router
 from routers.auth import router as auth_router
 from routers.multimodal import router as multimodal_router
@@ -27,9 +25,8 @@ app.add_middleware(
 
 # ✅ 라우터 포함
 app.include_router(dialogue_router)
-app.include_router(alerts_router)
-app.include_router(emotions_router)
-app.include_router(users_router)    
+#app.include_router(alerts_router)
+app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(multimodal_router)
 

@@ -1,8 +1,19 @@
 # backend/services/emotion_service.py
 
+<<<<<<< HEAD
 from models.clients.multimodal_client import multimodal_client
 from models.emotion_analyzer import analyze_emotion  # 텍스트 기본 감정 분석 모델
 from config import MODEL_WEIGHTS
+=======
+from __future__ import annotations
+import uuid
+import asyncio
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional, List
+from fastapi import HTTPException
+from models.emotion_analyzer import analyze_multimodal_emotion
+>>>>>>> develop
 from database.session import get_db_connection
 
 import asyncio

@@ -42,7 +42,8 @@ async def handle_user_speech(audio_file: UploadFile = File(...)):
         # 인식 실패 시: 감정 분석은 생략하고 안내 멘트만 반환 (기존 동작 유지)
         return {"response_text": "다시 말씀해 주시겠어요?", "emotion": "중립"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"STT 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"STT 처리 실패: {e}")
+    print(f"🎤 [STT 인식 결과]: {user_text}")
 
     # --- 3. 감정 분석 + DB 저장 (Fusion 모델: text + audio) ---
     try:
@@ -63,10 +64,52 @@ async def handle_user_speech(audio_file: UploadFile = File(...)):
     # --- 4. LLM 응답 생성 ---
     llm_response_text = get_llm_response(user_text)
 
-    # --- 5. TTS (Text-to-Speech) ---
-    tts_audio_bytes = tts_synthesize_to_bytes(llm_response_text)
-    if not tts_audio_bytes:
-        raise HTTPException(status_code=500, detail="TTS 오디오 생성 실패")
-        
-    # --- 6. 응답 반환 ---
-    return Response(content=tts_audio_bytes, media_type="audio/mp3")
+    # 4) 감정 분석 + DB 저장
+    analysis_result = await process_emotion_analysis(
+        text=user_text,
+        user_id=user_id,
+        image_frames=frame_bytes_list,
+        audio_bytes=wav_bytes,
+    )
+
+    emotion = analysis_result["emotion"]
+    confidence = float(analysis_result["confidence"])
+    risk_score = float(analysis_result["risk_score"])
+    ensemble_detail = analysis_result.get("ensemble_detail")
+
+    # 5) LLM 답변 생성
+    llm_reply = get_llm_response(
+        user_text=user_text,
+        emotion=emotion,
+        confidence=confidence,
+        risk_score=risk_score,
+        ensemble_detail=ensemble_detail,
+    )
+    print(f"🤖 [AI 답변]: {llm_reply}")
+
+    # 6) TTS 합성
+    tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
+    if tts_audio_bytes is None:
+        raise HTTPException(status_code=500, detail="TTS 합성 실패")
+
+    print(f"[TTS] length = {len(tts_audio_bytes)} bytes")  # ← 이 줄 추가
+
+    tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8")
+    print(f"[TTS] base64 length = {len(tts_b64)}")         # ← 이 줄 추가
+
+
+    # 7) Flutter로 응답
+    return JSONResponse(
+        content={
+            "user_id": user_id,
+            "user_text": user_text,
+            "emotion": emotion,
+            "confidence": confidence,
+            "risk_score": risk_score,
+            "llm_reply": llm_reply,
+            "tts_audio_base64": tts_b64,
+            "ensemble_detail": ensemble_detail,
+            "analysis_id": analysis_result.get("analysis_id"),
+            "timestamp": str(analysis_result.get("timestamp")),
+        }
+    )
