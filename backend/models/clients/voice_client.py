@@ -171,7 +171,6 @@ def _init_audio_model():
     _audio_model = model
     print(f"[VOICE_CLIENT] 음성 모델 로드 완료 → {AUDIO_MODEL_PATH}")
 
-
 def predict_voice_probs(wav_path: str) -> List[float]:
     """
     wav 파일 경로 입력 → [기쁨, 분노, 불안, 슬픔] 확률 반환
@@ -181,4 +180,8 @@ def predict_voice_probs(wav_path: str) -> List[float]:
     with torch.no_grad():
         logits = _audio_model(tensor)  # [1,4]
         probs = F.softmax(logits, dim=1)[0].cpu().numpy()
+
+    print(f"[VOICE_CLIENT] wav_path: {wav_path}")
+    print(f"[VOICE_CLIENT] 확률: {probs}")
+
     return [float(p) for p in probs]
