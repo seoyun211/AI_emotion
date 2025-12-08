@@ -18,6 +18,7 @@ cache/
 *.pt
 yolov8n.pt
 .DS_Store
+!backend/model_weights/*.pt
 
 # Face model - 데이터/캐시 폴더 무시
 face_model/cache/
