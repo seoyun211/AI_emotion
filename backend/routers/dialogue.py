@@ -17,6 +17,10 @@ from services.tts_service import tts_synthesize_to_bytes
 
 router = APIRouter(prefix="/dialogue", tags=["Dialogue"])
 
+from pydantic import BaseModel
+class ChatRequest(BaseModel):
+    text: str
+
 
 @router.post("/speak")
 async def handle_user_speech(
@@ -111,3 +115,21 @@ async def handle_user_speech(
             "timestamp": str(analysis_result.get("timestamp")),
         }
     )
+
+@router.post("/chat") # 최종 경로: /dialogue/chat
+async def chat_with_maldong(request: ChatRequest, user_id: Optional[int] = None):
+    try:
+        constrained_text = f"{request.text} (대답은 반드시 2줄 이내로 짧게 해줘)"
+        
+        # 기존 dialogue.py에서 사용하는 LLM 서비스 연결
+        # 감정 데이터가 없으므로 일단 기본값(Normal)으로 전달
+        llm_reply = get_llm_response(
+            user_text=constrained_text,
+            emotion="Normal", 
+            confidence=1.0,
+            risk_score=0.0
+        )
+        
+        return {"answer": llm_reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
