@@ -84,47 +84,51 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   }
 
   Future<void> _handleMaldongResponse() async {
-    if (_isProcessing) return;
+  if (_isProcessing) return;
 
-    setState(() {
-      _isProcessing = true;
-      _isListening = false;
-    });
+  // ✅ 답변 시작과 동시에 리스닝 상태를 false로, 프로세싱을 true로 바꿉니다.
+  setState(() {
+    _isProcessing = true;
+    _isListening = false; // 초록불 즉시 차단
+  });
 
-    _silenceTimer?.cancel();
-    await _stt.stop(); 
+  _silenceTimer?.cancel();
+  await _stt.stop(); // 마이크 중지
 
-    String capturedSpeech = _userSpeech;
-    setState(() => _userSpeech = ""); 
+  String capturedSpeech = _userSpeech;
+  setState(() => _userSpeech = ""); 
 
-    _addMessage(capturedSpeech, true);
+  _addMessage(capturedSpeech, true);
 
-    try {
-      final response = await http.post(
-        Uri.parse("$baseUrl/dialogue/chat"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"text": capturedSpeech}),
-      );
+  try {
+    final response = await http.post(
+      Uri.parse("$baseUrl/api/v1/dialogue/chat"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"text": capturedSpeech}),
+    );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        String maldongAnswer = data['answer'];
+    if (response.statusCode == 200) {
+      final data = jsonDecode(utf8.decode(response.bodyBytes));
+      String maldongAnswer = data['answer'];
 
-        _addMessage(maldongAnswer, false);
-        await _tts.speak(maldongAnswer);
-        await Future.delayed(const Duration(milliseconds: 500));
-      } else {
-        _addMessage("죄송해요, 잠시 딴생각을 했어요. 다시 말씀해 주시겠어요?", false);
-      }
-    } catch (e) {
-      _addMessage("연결이 불안정해요. 와이파이를 확인해 주세요!", false);
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        _startListening();
-      }
+      _addMessage(maldongAnswer, false);
+
+      // ✅ TTS가 재생되는 동안은 _isProcessing이 true이므로 마이크가 켜지지 않습니다.
+      await _tts.speak(maldongAnswer);
+      
+      // 잔향 차단을 위한 짧은 대기
+      await Future.delayed(const Duration(milliseconds: 500)); 
+    }
+  } catch (e) {
+    _addMessage("잠시 연결이 불안정해요.", false);
+  } finally {
+    if (mounted) {
+      setState(() => _isProcessing = false);
+      // ✅ 말동이가 말을 다 끝낸 '후'에만 다시 마이크를 켭니다.
+      _startListening();
     }
   }
+}
 
   void _addMessage(String text, bool isUser) {
     if (mounted) {
