@@ -11,6 +11,7 @@ import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http; // ★ HTTP 요청
+import 'chat_screen.dart';
 
 import '../main.dart';
 import '../maldong_avatar.dart';
@@ -420,22 +421,28 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                       fit: BoxFit.cover,
                     ),
                   ),
+
                   Positioned.fill(
                     child: Transform.scale(
                       scale: 0.9,
                       child: widget.avatar,
                     ),
                   ),
+
+                  const MaldongChatOverlay(),
+
                   Positioned(
                     top: 16,
                     left: 16,
                     child: _buildTimerBox(),
                   ),
+
                   Positioned(
                     top: 16,
                     right: 16,
                     child: _buildCameraPreview(),
                   ),
+
                   Positioned(
                     bottom: 32,
                     left: 0,
@@ -540,47 +547,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Widget _buildControlButtons() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _circleButton(Icons.chat_bubble_outline, () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('채팅 기능은 준비 중입니다.')),
-          );
-        }),
-        const SizedBox(width: 24),
-        GestureDetector(
-          onTap: () async {
-            _stopRecording();
-            _stopEmotionLoop();
-            await _endCallOnServer(); // ★ 통화 종료 기록
-            widget.onEndCall();
-          },
-          child: Container(
-            width: 90,
-            height: 90,
-            decoration: const BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Icon(Icons.call_end, color: Colors.white, size: 40),
-            ),
-          ),
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      _circleButton(_isCameraOn ? Icons.videocam_off : Icons.videocam, _toggleCamera),
+      const SizedBox(width: 20),
+      GestureDetector(
+        onTap: () async {
+          _stopRecording();
+          _stopEmotionLoop();
+          await _endCallOnServer();
+          widget.onEndCall();
+        },
+        child: Container(
+          width: 85, height: 85,
+          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+          child: const Center(child: Icon(Icons.call_end, color: Colors.white, size: 38)),
         ),
-        const SizedBox(width: 24),
-        _circleButton(
-          _isCameraOn ? Icons.videocam_off : Icons.videocam,
-          _toggleCamera,
-        ),
-        const SizedBox(width: 16),
-        _circleButton(
-          Icons.cameraswitch,
-          _switchCamera,
-        ),
-      ],
-    );
-  }
+      ),
+      const SizedBox(width: 20),
+      _circleButton(Icons.cameraswitch, _switchCamera),
+    ],
+  );
+}
 
   Widget _circleButton(IconData icon, VoidCallback onTap) {
     return GestureDetector(
