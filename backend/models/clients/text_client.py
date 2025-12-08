@@ -170,10 +170,10 @@ def _init_text_model():
 # ========================
 # 4. 외부 API
 # ========================
-
 def predict_text_probs(text: str) -> List[float]:
     """입력 문장을 4개 감정 확률로 반환"""
     if not text:
+        print("[TEXT_CLIENT] 빈 텍스트 → 균일분포 반환")
         return [0.25, 0.25, 0.25, 0.25]
 
     if not _initialized:
@@ -189,4 +189,8 @@ def predict_text_probs(text: str) -> List[float]:
         logits = _text_model(token_ids, valid_length, segment_ids)
         probs = F.softmax(logits, dim=-1)[0].cpu().numpy()
 
+    print(f"[TEXT_CLIENT] 입력: {text}")
+    print(f"[TEXT_CLIENT] 확률: {probs}")  # ← 여기가 중요
+
     return [float(p) for p in probs]
+

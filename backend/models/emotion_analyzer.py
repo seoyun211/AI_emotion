@@ -26,14 +26,7 @@ def analyze_multimodal_emotion(
     text: Optional[str],
     wav_path: Optional[str],
 ) -> Dict[str, Any]:
-    """
-    - image_frames: 프레임 bytes 리스트 (0~N장)
-    - text       : STT 결과 또는 사용자가 입력한 텍스트
-    - wav_path   : 임시 저장된 wav 파일 경로 (없으면 None)
-
-    각각 모달리티가 None/빈값이면 → 균일분포 사용.
-    """
-
+    ...
     # 1) 이미지
     if image_frames:
         try:
@@ -64,10 +57,17 @@ def analyze_multimodal_emotion(
     else:
         p_audio = _default_probs()
 
+    # 🔥 여기 디버그 출력 추가
+    print("[DEBUG] p_img :", p_img)
+    print("[DEBUG] p_text:", p_text)
+    print("[DEBUG] p_audio:", p_audio)
+
     # 4) 앙상블 결합
     result = ensemble_model.predict(
         image_probs=p_img,
         text_probs=p_text,
         audio_probs=p_audio,
     )
+    print("[DEBUG] final probs:", result["final"]["probabilities"])
+
     return result

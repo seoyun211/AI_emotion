@@ -97,17 +97,25 @@ def _init_models():
 # ====================================================
 
 def _get_face_crop_from_bytes(frame_bytes: bytes) -> Optional[Image.Image]:
-    """
-    1개 프레임(bytes) → YOLOv8n으로 사람/얼굴 근처 박스 검출 → 얼굴 영역 추출 (PIL.Image) 또는 None
-    """
     _init_models()
-    assert _yolo_model is not None
 
-    # bytes → np array (BGR)
     np_arr = np.frombuffer(frame_bytes, np.uint8)
     bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     if bgr is None:
+        print("[YOLO] 이미지 디코딩 실패")
         return None
+
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+
+    results = _yolo_model(rgb)[0]
+    boxes = results.boxes
+
+    print(f"[YOLO] 감지된 박스 수: {len(boxes) if boxes is not None else 0}")
+
+    if boxes is None or len(boxes) == 0:
+        print("[YOLO] 얼굴 박스 없음 → 기본값 사용")
+        return None
+
 
     # BGR → RGB
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
