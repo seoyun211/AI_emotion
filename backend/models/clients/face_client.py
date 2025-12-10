@@ -35,6 +35,7 @@ EMOTION_LABELS = ["기쁨", "분노", "불안", "슬픔"]  # 0,1,2,3
 
 # ====================================================
 # 1. 이미지 감정 모델 (EfficientNet-B0)
+#   - state_dict 키: "features.*", "classifier.*" 에 맞춤
 # ====================================================
 
 def get_image_transform():
@@ -51,15 +52,30 @@ def get_image_transform():
 
 
 class ExpressionNet(nn.Module):
+    """
+    훈련할 때 쓴 EfficientNet-B0 구조랑 state_dict 키 맞추기용 래퍼
+    - checkpoint 키: "features.0.0.weight", "classifier.1.weight", ...
+    """
     def __init__(self, num_classes: int = 4):
         super().__init__()
-        model = efficientnet_b0(weights=None)
-        in_features = model.classifier[1].in_features
-        model.classifier[1] = nn.Linear(in_features, num_classes)
-        self.backbone = model
+        base = efficientnet_b0(weights=None)
+
+        in_features = base.classifier[1].in_features
+        base.classifier[1] = nn.Linear(in_features, num_classes)
+
+        # 🔹 state_dict가 "features.*", "classifier.*" 구조로 나오도록 그대로 꺼내서 멤버로 사용
+        self.features = base.features
+        self.avgpool = base.avgpool
+        self.dropout = base.dropout
+        self.classifier = base.classifier
 
     def forward(self, x):
-        return self.backbone(x)
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout(x)
+        x = self.classifier(x)
+        return x
 
 
 _face_model: Optional[ExpressionNet] = None
@@ -80,7 +96,7 @@ def _init_models():
             raise FileNotFoundError(f"이미지 모델 weight 파일이 없습니다: {IMAGE_MODEL_PATH}")
         model = ExpressionNet(num_classes=len(EMOTION_LABELS)).to(DEVICE)
         state = torch.load(IMAGE_MODEL_PATH, map_location=DEVICE)
-        model.load_state_dict(state)
+        model.load_state_dict(state)  # strict=True 기본값, 이제 키가 맞음
         model.eval()
         _face_model = model
         print(f"[FACE_CLIENT] 이미지 모델 로드 완료 → {IMAGE_MODEL_PATH}")
@@ -97,34 +113,31 @@ def _init_models():
 # ====================================================
 
 def _get_face_crop_from_bytes(frame_bytes: bytes) -> Optional[Image.Image]:
+    """
+    1개 프레임(bytes) → YOLOv8n으로 박스 검출 → 가장 conf 높은 박스 crop
+    """
     _init_models()
+    assert _yolo_model is not None
 
+    # bytes → np array → BGR
     np_arr = np.frombuffer(frame_bytes, np.uint8)
     bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
     if bgr is None:
         print("[YOLO] 이미지 디코딩 실패")
         return None
 
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-
-    results = _yolo_model(rgb)[0]
-    boxes = results.boxes
-
-    print(f"[YOLO] 감지된 박스 수: {len(boxes) if boxes is not None else 0}")
-
-    if boxes is None or len(boxes) == 0:
-        print("[YOLO] 얼굴 박스 없음 → 기본값 사용")
-        return None
-
-
     # BGR → RGB
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
     # YOLO 추론
-    results = _yolo_model(rgb)[0]   # 첫 번째 결과
+    results = _yolo_model(rgb)[0]
     boxes = results.boxes
 
+    n_boxes = 0 if boxes is None else len(boxes)
+    print(f"[YOLO] 감지된 박스 수: {n_boxes}")
+
     if boxes is None or len(boxes) == 0:
+        print("[YOLO] 얼굴 박스 없음 → 기본값 사용")
         return None
 
     # 가장 confidence 높은 박스 1개 선택
@@ -141,10 +154,12 @@ def _get_face_crop_from_bytes(frame_bytes: bytes) -> Optional[Image.Image]:
     y2 = int(max(0, min(h, y2)))
 
     if x2 <= x1 or y2 <= y1:
+        print("[YOLO] bbox 좌표 이상 → 무시")
         return None
 
     face = rgb[y1:y2, x1:x2, :]
     if face.size == 0:
+        print("[YOLO] crop 결과가 비어 있음")
         return None
 
     return Image.fromarray(face)  # PIL.Image
