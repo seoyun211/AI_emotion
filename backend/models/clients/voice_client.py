@@ -94,6 +94,11 @@ def preprocess_audio(audio_path: str, max_timesteps: int = None) -> torch.Tensor
 
 
 class CNNBiLSTM(nn.Module):
+    """
+    audio_model.pt 의 state_dict 키:
+      - "... output_layer.weight", "output_layer.bias"
+    에 맞추기 위해 self.output_layer 사용
+    """
     def __init__(self, input_channels: int, num_classes: int, drop_rate: float = 0.5):
         super().__init__()
         self.conv1 = nn.Conv1d(input_channels, 256, kernel_size=5, padding="same", bias=False)
@@ -124,7 +129,9 @@ class CNNBiLSTM(nn.Module):
 
         self.dense1 = nn.Linear(128, 64)
         self.dropout5 = nn.Dropout(drop_rate)
-        self.out = nn.Linear(64, num_classes)
+
+        # 🔹 학습 때 쓰인 이름에 맞춰서
+        self.output_layer = nn.Linear(64, num_classes)
 
     def forward(self, x):
         # x: [B, C, T]
@@ -152,7 +159,7 @@ class CNNBiLSTM(nn.Module):
 
         x = torch.relu(self.dense1(x))
         x = self.dropout5(x)
-        return self.out(x)
+        return self.output_layer(x)
 
 
 _audio_model: Optional[CNNBiLSTM] = None
@@ -166,10 +173,11 @@ def _init_audio_model():
         raise FileNotFoundError(f"음성 모델 weight 파일이 없습니다: {AUDIO_MODEL_PATH}")
     model = CNNBiLSTM(input_channels=FEATURE_DIM, num_classes=len(EMOTION_LABELS)).to(DEVICE)
     state = torch.load(AUDIO_MODEL_PATH, map_location=DEVICE)
-    model.load_state_dict(state)
+    model.load_state_dict(state)   # 이제 키 이름이 맞음
     model.eval()
     _audio_model = model
     print(f"[VOICE_CLIENT] 음성 모델 로드 완료 → {AUDIO_MODEL_PATH}")
+
 
 def predict_voice_probs(wav_path: str) -> List[float]:
     """

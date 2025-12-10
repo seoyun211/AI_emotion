@@ -10,7 +10,7 @@
 """
 
 from __future__ import annotations
-from typing import List, Tuple
+from typing import List
 
 import numpy as np
 import torch
@@ -28,7 +28,7 @@ from transformers import BertModel
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 🔥 상대 경로로 모델 weight 로드 (절대경로 절대 금지!!!)
+# 🔥 상대 경로로 모델 weight 로드
 BASE_DIR = Path(__file__).resolve().parent.parent  # backend/models
 WEIGHT_DIR = BASE_DIR / "weights"
 TEXT_MODEL_PATH = WEIGHT_DIR / "text_model.pt"
@@ -81,7 +81,7 @@ class BERTSentenceTransform:
             segment_ids += [1] * (len(tokens) - len(segment_ids))
 
         input_ids = self._tokenizer.convert_tokens_to_ids(tokens)
-        valid_length = len(input_ids)
+        valid_length = len(input_ids)   # 🔹 int
 
         if self._pad:
             pad_len = self._max_seq_length - valid_length
@@ -90,7 +90,7 @@ class BERTSentenceTransform:
 
         return (
             np.array(input_ids, dtype="int32"),
-            np.array(valid_length, dtype="int32"),
+            int(valid_length),                           # 🔹 scalar int 로 반환
             np.array(segment_ids, dtype="int32"),
         )
 
@@ -170,6 +170,7 @@ def _init_text_model():
 # ========================
 # 4. 외부 API
 # ========================
+
 def predict_text_probs(text: str) -> List[float]:
     """입력 문장을 4개 감정 확률로 반환"""
     if not text:
@@ -179,18 +180,18 @@ def predict_text_probs(text: str) -> List[float]:
     if not _initialized:
         _init_text_model()
 
-    ids_np, valid_np, seg_np = _transform([text])
+    ids_np, valid_len, seg_np = _transform([text])
 
-    token_ids = torch.tensor([ids_np]).to(DEVICE)
-    valid_length = torch.tensor([valid_np]).to(DEVICE)
-    segment_ids = torch.tensor([seg_np]).to(DEVICE)
+    # 🔹 numpy -> tensor 변환을 명확하게
+    token_ids = torch.from_numpy(ids_np).unsqueeze(0).to(DEVICE)       # [1, L]
+    segment_ids = torch.from_numpy(seg_np).unsqueeze(0).to(DEVICE)     # [1, L]
+    valid_length = torch.tensor([valid_len], dtype=torch.long).to(DEVICE)  # [1]
 
     with torch.no_grad():
         logits = _text_model(token_ids, valid_length, segment_ids)
         probs = F.softmax(logits, dim=-1)[0].cpu().numpy()
 
     print(f"[TEXT_CLIENT] 입력: {text}")
-    print(f"[TEXT_CLIENT] 확률: {probs}")  # ← 여기가 중요
+    print(f"[TEXT_CLIENT] 확률: {probs}")
 
     return [float(p) for p in probs]
-

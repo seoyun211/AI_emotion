@@ -21,6 +21,16 @@ from pydantic import BaseModel
 class ChatRequest(BaseModel):
     text: str
 
+@router.post("/speak")
+async def handle_user_speech(
+    audio_file: UploadFile = File(...),
+    frames: List[UploadFile] = File([]),
+    user_id: Optional[int] = None,
+):
+    print("[/dialogue/speak] ✅ 요청 들어옴")
+    print(f"  - user_id: {user_id}, frames: {len(frames)}")
+
+    # 아래는 그대로 ...
 
 @router.post("/speak")
 async def handle_user_speech(
