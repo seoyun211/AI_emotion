@@ -166,7 +166,7 @@ class DailyEmotionResponse(BaseModel):
 
 
 # ------------------------------------------------
-# ⭐⭐⭐ 수정된 부분: 감정 4종 그대로 반환하는 구조
+# 수정된 부분: 감정 4종 그대로 반환하는 구조
 # ------------------------------------------------
 class EmotionStatsResponse(BaseModel):
     joy: int      # 기쁨
@@ -199,6 +199,33 @@ class SessionCreate(SessionBase):
 class SessionResponse(SessionBase):
     """통화기록 조회용"""
     session_id: int
+
+
+class SessionListResponse(BaseModel):
+    sessions: List[SessionResponse]
+class SessionBase(BaseModel):
+    user_id: int
+    start_time: datetime
+    end_time: Optional[datetime] = None
+    duration_seconds: Optional[int] = None
+    
+    # ✅ 추가된 필드: STT 텍스트 저장
+    full_transcript: Optional[str] = None 
+
+
+class SessionCreate(SessionBase):
+    """통화 종료 시 기록 저장할 때 사용"""
+    # SessionBase를 상속받았으므로 full_transcript가 자동으로 포함됩니다.
+    pass
+
+
+class SessionResponse(SessionBase):
+    """통화기록 조회용"""
+    session_id: int
+    
+    class Config:
+        # Pydantic 2.x에서는 orm_mode=True 대신 from_attributes=True를 사용합니다.
+        from_attributes = True
 
 
 class SessionListResponse(BaseModel):

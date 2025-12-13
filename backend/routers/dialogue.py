@@ -4,9 +4,12 @@ from __future__ import annotations
 from typing import List, Optional
 from io import BytesIO
 import base64
+from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
+from models.schemas import SessionCreate, SessionResponse
+from database.crud import SessionCRUD
 
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -133,3 +136,66 @@ async def chat_with_maldong(request: ChatRequest, user_id: Optional[int] = None)
         return {"answer": llm_reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.post("/session/start", response_model=SessionResponse)
+def start_session(user_id: int):
+    """
+    통화 시작 시, Session 레코드를 생성하고 session_id를 반환합니다.
+    """
+    now = datetime.now()
+    now_str = now.strftime('%Y-%m-%d %H:%M:%S') # DB에 문자열로 전달
+
+    session_id = SessionCRUD.create_session(
+        user_id=user_id,
+        start_time=now_str,
+        end_time=None,
+        duration_seconds=None,
+        full_transcript=None
+    )
+    
+    if session_id is None:
+        raise HTTPException(status_code=500, detail="통화 세션 시작 기록 생성 실패")
+    # 응답은 SessionResponse Pydantic 모델이 처리하므로 datetime 객체를 그대로 반환해도 되지만
+    # # 명확성을 위해 문자열 포맷을 맞춥니다.
+    
+    return {
+        "session_id": session_id,
+        "user_id": user_id,
+        "start_time": now, # Pydantic이 ISO 포맷으로 변환 처리
+        "end_time": None,
+        "duration_seconds": None,
+        "full_transcript": None
+    }
+
+
+@router.post("/session/end", response_model=SessionResponse)
+def end_session(session_id: int, user_id: int, full_transcript: str):
+    """
+    통화 종료 시, Session 레코드를 업데이트하고 최종 녹취록을 저장합니다.
+    """
+    now = datetime.now()
+    now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+
+    # 1. 세션 업데이트 (종료 시간, 녹취록, 지속 시간 계산)
+    success = SessionCRUD.update_session(
+        session_id=session_id,
+        end_time=now_str,
+        full_transcript=full_transcript
+    )
+    
+    if not success:
+        # 업데이트 실패 시, 404 또는 500 오류 반환
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
+                            detail=f"세션 ID {session_id}를 찾을 수 없거나 업데이트에 실패했습니다.")
+    
+    # 2. 업데이트된 레코드 전체 조회 (새로 추가된 get_session_by_id 사용)
+    updated_session_data = SessionCRUD.get_session_by_id(session_id=session_id)
+
+    if updated_session_data is None:
+        # 업데이트는 성공했지만 조회가 안 되는 경우 (매우 드뭄, 서버 오류)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+                            detail=f"세션 ID {session_id} 종료 후 최종 데이터 조회 실패")
+
+    # ✅ CRUD에서 반환된 최종 딕셔너리 데이터를 Pydantic 스키마에 맞게 바로 반환
+    return updated_session_data

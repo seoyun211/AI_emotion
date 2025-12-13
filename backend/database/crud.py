@@ -5,26 +5,28 @@ import asyncio
 import bcrypt
 
 # =========================================================================
-# 1. 인증/비밀번호 관련 함수
+# 1. 인증/비밀번호 관련 함수 (bcrypt 구현 완료)
 # =========================================================================
 
-# TODO: hash_password 구현 필요
 def hash_password(password: str) -> str:
-    """비밀번호를 해시합니다. (실제 구현 필요)"""
+    """비밀번호를 해시합니다. (bcrypt 실제 구현)"""
     if not password:
         raise ValueError("비밀번호는 비워둘 수 없습니다.")
-    # 실제 bcrypt 해싱 로직을 여기에 구현해야 합니다.
-    # 예시: return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    return "DUMMY_HASHED_PASSWORD"  # 임시 더미 값
+    # 실제 bcrypt 해싱 로직
+    # salt를 생성하고, password를 인코딩한 후 해시합니다.
+    hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    return hashed_bytes.decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """평문 비밀번호와 해시된 비밀번호를 비교합니다."""
     try:
+        # DB에 저장된 해시된 비밀번호는 문자열이므로, 비교를 위해 바이트로 인코딩해야 합니다.
         return bcrypt.checkpw(
             plain_password.encode('utf-8'),
             hashed_password.encode('utf-8')
         )
     except ValueError:
+        # 해시된 비밀번호가 잘못된 형식일 경우 (예: DUMMY_HASHED_PASSWORD)
         return False
 
 # =========================================================================
@@ -138,6 +140,7 @@ class UserCRUD:
         sql_disable_fk = "SET FOREIGN_KEY_CHECKS = 0;"
         sql_enable_fk = "SET FOREIGN_KEY_CHECKS = 1;"
 
+        # 주의: 이 SQL 쿼리들은 User 테이블의 user_id가 Alert, Session, AnalysisChunk 등의 user_id 필드와 WardRelationship의 두 필드 모두에 외래 키로 연결되어 있다고 가정합니다.
         sql_delete_relationship = "DELETE FROM GuardianRelationship WHERE guardian_user_id = %s OR ward_user_id = %s"
         sql_delete_alerts = "DELETE FROM Alert WHERE user_id = %s"
         sql_delete_chunks = "DELETE FROM AnalysisChunk WHERE user_id = %s"
@@ -314,3 +317,186 @@ class AlertCRUD:
         alerts_data = await asyncio.to_thread(fetch_alerts)
 
         return alerts_data
+    
+# =========================================================================
+# 6. 통화 기록 관리 (SessionCRUD)
+# =========================================================================
+
+class SessionCRUD:
+    """통화 기록(Session) 관리 클래스"""
+
+    @staticmethod
+    def create_session(user_id: int, start_time: str, end_time: str | None, duration_seconds: int | None, full_transcript: str | None) -> int | None:
+        """
+        새로운 통화 기록(Session)을 데이터베이스에 저장합니다.
+        """
+        connection = None
+        session_id = None
+
+        try:
+            connection = get_db_connection()
+            
+            # SQL 쿼리: full_transcript 필드에 값을 저장하도록 수정
+            sql = """
+                INSERT INTO Session 
+                    (user_id, start_time, end_time, duration_seconds, full_transcript) 
+                VALUES 
+                    (%s, %s, %s, %s, %s)
+            """
+            
+            # SQL에 전달할 데이터 (순서가 SQL 필드와 일치해야 함)
+            data = (
+                user_id, 
+                start_time, 
+                end_time, 
+                duration_seconds, 
+                full_transcript  # STT 텍스트 데이터
+            )
+
+            with connection.cursor() as cursor:
+                cursor.execute(sql, data)
+                
+                # 새로 생성된 ID를 가져옵니다.
+                session_id = cursor.lastrowid
+                
+                connection.commit()
+                
+                print(f"✅ Session 생성 성공. Session ID: {session_id}")
+                return session_id
+
+        except Exception as e:
+            if connection:
+                connection.rollback() # 오류 발생 시 롤백
+            print(f"❌ Session 생성 실패 (DB Error in crud.py): {e}")
+            return None
+            
+        finally:
+            # Note: DB 연결 관리는 get_db_connection()에서 처리한다고 가정하고 여기서는 pass
+            pass
+            
+
+    @staticmethod
+    def update_session(session_id: int, end_time: str, full_transcript: str):
+        """특정 session_id의 통화 기록을 종료 시간과 최종 녹취록으로 업데이트합니다."""
+        connection = get_db_connection()
+        if not connection:
+            return None
+        
+        # duration_seconds는 MySQL의 TIMESTAMPDIFF(SECOND, start_time, end_time)을 사용하여 계산
+        sql = """
+            UPDATE Session
+            SET 
+                end_time = %s,
+                full_transcript = %s,
+                duration_seconds = TIMESTAMPDIFF(SECOND, start_time, %s) 
+            WHERE 
+                session_id = %s
+        """
+        
+        params = (
+            end_time,
+            full_transcript,
+            end_time, # TIMESTAMPDIFF의 두 번째 인수로 사용
+            session_id
+        )
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, params)
+            connection.commit()
+            return True # 성공 여부만 반환하도록 단순화
+        except Exception as e:
+            connection.rollback()
+            print(f"❌ Session 업데이트 실패: {e}")
+            return None
+
+    @staticmethod
+    def get_session_by_id(session_id: int) -> Dict | None:
+        """
+        특정 session_id에 해당하는 통화 기록(Session)을 조회합니다.
+        """
+        connection = get_db_connection()
+        if not connection:
+            # ... (오류 처리)
+            return None
+
+        sql = """
+            SELECT 
+                session_id, 
+                user_id, 
+                start_time, 
+                end_time, 
+                duration_seconds, 
+                full_transcript
+            FROM Session
+            WHERE session_id = %s
+        """
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (session_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            # ... (오류 처리)
+            return None
+
+    @staticmethod
+    def get_session_by_id(session_id: int) -> Dict | None:
+        """
+        특정 session_id에 해당하는 통화 기록(Session)을 조회합니다.
+        """
+        connection = get_db_connection()
+        if not connection:
+            # ... (오류 처리)
+            return None
+
+        sql = """
+            SELECT 
+                session_id, 
+                user_id, 
+                start_time, 
+                end_time, 
+                duration_seconds, 
+                full_transcript
+            FROM Session
+            WHERE session_id = %s
+        """
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (session_id,))
+                return cursor.fetchone()
+        except Exception as e:
+            # ... (오류 처리)
+            return None        
+
+    @staticmethod
+    def get_sessions_by_user_id(user_id: int) -> list[Dict]:
+        """
+        특정 피보호자(user_id)의 통화 기록 전체를 조회합니다. (피보호자 본인 앱용)
+        """
+        connection = get_db_connection()
+        if not connection:
+            return []
+
+        sql = """
+            SELECT 
+                session_id, 
+                user_id, 
+                start_time, 
+                end_time, 
+                duration_seconds, 
+                full_transcript
+            FROM Session
+            WHERE user_id = %s
+            ORDER BY start_time DESC
+        """
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(sql, (user_id,))
+                return cursor.fetchall()
+
+        except Exception as e:
+            print(f"❌ UserID로 통화 기록 조회 중 DB 쿼리 오류: {e}")
+            return []
