@@ -16,6 +16,7 @@ import 'screens/settings_screen.dart';
 import 'screens/video_call_screen.dart';
 import 'font_size_provider.dart';
 import 'maldong_avatar.dart';
+import 'package:camera/camera.dart';
 
 // GLB 파일 경로
 const customAvatarUrl = 'assets/model.glb';
@@ -25,9 +26,20 @@ late List<CameraDescription> cameras;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 기기 카메라 목록 미리 가져오기
-  cameras = await availableCameras();
+  // 🔴 카메라 초기화에 try-catch 적용
+  try {
+    cameras = await availableCameras();
+    print('✅ 카메라 목록 로드 성공: ${cameras.length}개');
+  } on CameraException catch (e) {
+    // 카메라 초기화 실패 시 빈 리스트로 초기화하고 오류 메시지 출력
+    cameras = [];
+    print('🚨 카메라 초기화 실패 (CameraException): ${e.code} - ${e.description}');
+    print('다른 프로그램이 카메라를 사용 중이거나 권한 문제일 수 있습니다.');
+  } catch (e) {
+    // 기타 예상치 못한 오류 처리
+    cameras = [];
+    print('🚨 카메라 초기화 중 예상치 못한 오류 발생: $e');
+  }
 
   // 한국어 날짜 로케일 설정
   await initializeDateFormatting('ko_KR', null);

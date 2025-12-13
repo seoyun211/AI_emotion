@@ -14,6 +14,7 @@ from routers.guardian import router as guardian_router
 from routers.calls import router as calls_router  
 from routers.analyses import router as analyses_router 
 
+
 # -------------------------
 # 🚀 FastAPI 앱 및 미들웨어 설정
 # -------------------------
@@ -30,13 +31,13 @@ app.add_middleware(
 
 # ✅ 라우터 포함
 #  - /api/v1/dialogue/speak : 영상통화 + 감정 + LLM + TTS
-app.include_router(dialogue_router)
-#app.include_router(alerts_router)
-app.include_router(users_router)
-app.include_router(auth_router)
-app.include_router(guardian_router)
-app.include_router(calls_router) 
-app.include_router(analyses_router)   
+app.include_router(dialogue_router, prefix="/api/v1") 
+#app.include_router(alerts_router, prefix="/api/v1") 
+app.include_router(users_router)    
+app.include_router(auth_router)     
+app.include_router(guardian_router, prefix="/api/v1") 
+app.include_router(calls_router, prefix="/api/v1")    
+app.include_router(analyses_router, prefix="/api/v1")
 
 # 👉 나중에 새 앙상블 엔드포인트 만들면 여기서 새로운 router를 include 하면 돼
 # from routers.ensemble import router as ensemble_router
