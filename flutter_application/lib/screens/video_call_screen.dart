@@ -17,7 +17,8 @@ import '../main.dart';
 import '../maldong_avatar.dart';
 import '../services/dialogue_service.dart'; 
 
-// ★ 본인 환경에 맞게 수정 (이 라우터에서는 통화 시작/종료 API를 사용하지 않음)
+// ★ 본인 환경에 맞게 수정 (에뮬레이터면 10.0.2.2, 실제 기기면 PC IP)
+// const String baseUrl = 'http://10.0.2.2:8000';
 const String baseUrl = 'http://localhost:8000';
 
 class VideoCallScreen extends StatefulWidget {

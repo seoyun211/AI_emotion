@@ -35,11 +35,10 @@ app.include_router(dialogue_router, prefix="/api/v1")
 #app.include_router(alerts_router, prefix="/api/v1") 
 app.include_router(users_router)    
 app.include_router(auth_router)     
-app.include_router(guardian_router, prefix="/api/v1") 
+app.include_router(guardian_router)
 app.include_router(calls_router, prefix="/api/v1")    
 app.include_router(analyses_router, prefix="/api/v1")
 
-# 👉 나중에 새 앙상블 엔드포인트 만들면 여기서 새로운 router를 include 하면 돼
 # from routers.ensemble import router as ensemble_router
 # app.include_router(ensemble_router)
 

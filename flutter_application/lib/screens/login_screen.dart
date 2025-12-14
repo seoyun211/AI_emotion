@@ -7,6 +7,7 @@ import 'guardian/guardian_home_screen.dart';
 import '../maldong_avatar.dart';
 import 'signup_screen.dart';
 
+// const String baseUrl = 'http://10.0.2.2:8000';
 const String baseUrl = 'http://localhost:8000';
 
 class LoginScreen extends StatefulWidget {
