@@ -185,17 +185,17 @@ class GuardianCRUD:
     """보호자-피보호자 관계(GuardianRelationship) 관리 클래스"""
 
     @staticmethod
-    def create_relationship(guardian_id: int, ward_id: int):
+    def create_relationship(guardian_id: int, ward_id: int, status: str = 'active'): 
         """보호자와 피보호자 사이에 관리 관계를 생성합니다."""
         connection = get_db_connection()
         if not connection:
             raise Exception("DB 연결 실패")
 
         sql = """
-            INSERT INTO GuardianRelationship (guardian_user_id, ward_user_id)
-            VALUES (%s, %s)
+            INSERT INTO GuardianRelationship (guardian_user_id, ward_user_id, status) 
+            VALUES (%s, %s, %s)                                                  
         """
-        params = (guardian_id, ward_id)
+        params = (guardian_id, ward_id, status)                               
 
         try:
             with connection.cursor() as cursor:

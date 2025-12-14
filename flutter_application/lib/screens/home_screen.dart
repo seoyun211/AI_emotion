@@ -7,7 +7,8 @@ import 'settings_screen.dart';
 import '../screens/video_call_screen.dart';
 import '../maldong_avatar.dart';
 
-const String baseUrl = 'http://10.0.2.2:8000';
+// const String baseUrl = 'http://10.0.2.2:8000';
+const String baseUrl = 'http://localhost:8000';
 const customAvatarUrl = 'assets/model.glb';
 
 class HomeScreen extends StatefulWidget {
