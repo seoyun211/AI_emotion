@@ -17,8 +17,8 @@ import '../main.dart';
 import '../maldong_avatar.dart';
 import '../services/dialogue_service.dart'; 
 
-// ★ 본인 환경에 맞게 수정 (이 라우터에서는 통화 시작/종료 API를 사용하지 않음)
-const String baseUrl = 'http://localhost:8000';
+// ★ 본인 환경에 맞게 수정 (에뮬레이터면 10.0.2.2, 실제 기기면 PC IP)
+const String baseUrl = 'http://10.0.2.2:8000';
 
 class VideoCallScreen extends StatefulWidget {
     final VoidCallback onEndCall;
@@ -205,39 +205,50 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     // =========================
 
     // 1. 짧은 오디오 녹음
-    Future<Uint8List> _recordShortAudio() async {
-        if (kIsWeb) return Uint8List(0);
-        
-        // 권한 확인 및 요청
-        if (!await Permission.microphone.request().isGranted) {
-            debugPrint("마이크 권한 없음");
-            return Uint8List(0);
-        }
-        
-        try {
-            final dir = await getTemporaryDirectory();
-            final path = '${dir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.mp4';
+Future<Uint8List> _recordShortAudio() async {
+  if (kIsWeb) return Uint8List(0);
 
-            await _audioRecorder.start(
-                const RecordConfig(encoder: AudioEncoder.aacLc), 
-                path: path
-            );
-            
-            // 1초 녹음 후 중지
-            await Future.delayed(const Duration(seconds: 1));
-            final resultPath = await _audioRecorder.stop();
+  if (!await Permission.microphone.request().isGranted) {
+    debugPrint("마이크 권한 없음");
+    return Uint8List(0);
+  }
 
-            if (resultPath != null) {
-                final file = File(resultPath);
-                final bytes = await file.readAsBytes();
-                await file.delete(); // 임시 파일 삭제
-                return bytes;
-            }
-        } catch (e) {
-            debugPrint("오디오 녹음 오류: $e");
-        }
-        return Uint8List(0);
+  try {
+    final dir = await getTemporaryDirectory();
+
+    // ✅ mp4 → wav
+    final path =
+        '${dir.path}/temp_audio_${DateTime.now().millisecondsSinceEpoch}.wav';
+
+    await _audioRecorder.start(
+      const RecordConfig(
+        // ✅ aacLc → wav
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: path,
+    );
+
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final resultPath = await _audioRecorder.stop();
+    if (resultPath != null) {
+      final file = File(resultPath);
+      final bytes = await file.readAsBytes();
+
+      debugPrint("녹음 bytes=${bytes.length}, path=$resultPath");
+
+      await file.delete();
+      return bytes;
     }
+  } catch (e) {
+    debugPrint("오디오 녹음 오류: $e");
+  }
+
+  return Uint8List(0);
+}
+
 
     // 2. 프레임 캡처
     Future<List<Uint8List>> _captureFrames({int count = 1}) async {

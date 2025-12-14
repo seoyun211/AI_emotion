@@ -24,7 +24,7 @@ class MaldongChatOverlay extends StatefulWidget {
 
 class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   final List<ChatMessage> _messages = [];
-  final String baseUrl = "http://localhost:8000";
+  final String baseUrl = "http://10.0.2.2:8000";
 
   final SpeechToText _stt = SpeechToText();
   final FlutterTts _tts = FlutterTts();
