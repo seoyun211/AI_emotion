@@ -28,8 +28,8 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   bool isLoading = true;
   String? errorMessage;
   
-  // static const String baseUrl = 'http://10.0.2.2:8000';
-  static const String baseUrl = 'http://localhost:8000';
+  static const String baseUrl = 'http://10.0.2.2:8000';
+  // static const String baseUrl = 'http://localhost:8000';
   
   List<DailyEmotion> recentEmotions = [];
   EmotionStats? emotionStats;
