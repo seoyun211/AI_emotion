@@ -11,7 +11,7 @@ import '../models/dialogue_response.dart';
 import '../models/session.dart'; // ✅ Session 모델 임포트
 
 /// 🔗 말동이 백엔드 베이스 URL
-const String baseUrl = "http://localhost:8000";
+const String baseUrl = "http://10.0.2.2:8000";
 
 /// 전역 TTS 플레이어 (한 개만 만들어서 재사용)
 final AudioPlayer maldongTtsPlayer = AudioPlayer();

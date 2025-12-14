@@ -1,14 +1,27 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Gradle Plugin 버전 업그레이드
+        classpath 'com.android.tools.build:gradle:8.9.1'  // 최신 버전으로 업데이트
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.10' // 최신 Kotlin 버전
+    }
+}
+
+
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
     namespace = "com.example.flutter_application"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36  // 최신 SDK 버전
+
+    ndkVersion = "26.1.10909125"  // NDK 버전 (최신 버전)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -20,25 +33,20 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.flutter_application"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        minSdkVersion = flutter.minSdkVersion  // 최소 SDK 버전 21 이상 (필요에 따라 수정)
+        targetSdk = 36  // 목표 SDK 버전 36으로 설정
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = signingConfigs.debug  // 개발용 디버그 키로 설정
         }
     }
 }
 
 flutter {
-    source = "../.."
+    source = "../.."  // Flutter SDK 경로 설정
 }

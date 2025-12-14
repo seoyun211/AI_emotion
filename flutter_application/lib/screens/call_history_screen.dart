@@ -36,7 +36,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     });
 
     try {
-      final url = Uri.parse('http://localhost:8000/api/v1/calls/user/${widget.userId}');
+      final url = Uri.parse('http://10.0.2.2:8000/api/v1/calls/user/${widget.userId}');
       
       final response = await http.get(
         url,
