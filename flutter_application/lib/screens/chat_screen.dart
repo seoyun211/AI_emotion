@@ -5,6 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
+// 통화 세션 관리를 위한 임포트
+import '../models/session.dart'; 
+import '../services/dialogue_service.dart';
+
 class ChatMessage {
   final String text;
   final bool isUser;
@@ -20,7 +24,7 @@ class MaldongChatOverlay extends StatefulWidget {
 
 class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   final List<ChatMessage> _messages = [];
-  final String baseUrl = "http://192.168.34.40:8000";
+  final String baseUrl = "http://10.0.2.2:8000";
 
   final SpeechToText _stt = SpeechToText();
   final FlutterTts _tts = FlutterTts();
@@ -30,11 +34,55 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   String _userSpeech = ""; 
   Timer? _silenceTimer;
 
+  // 세션 관리 상태 변수
+  int? _currentSessionId;
+  String _fullTranscript = ''; 
+  final int _userId = 1; // ⭐ 실제 로그인된 userId로 대체 필요
+
   @override
   void initState() {
     super.initState();
     _initializeServices();
+    _startSessionOnServer(); // 세션 시작 호출
   }
+  
+  // ===================================
+  // 세션 관리 로직 (DB 저장)
+  // ===================================
+
+  // 세션 시작 (POST /session/start)
+  Future<void> _startSessionOnServer() async {
+    try {
+      final session = await startSession(userId: _userId);
+      setState(() {
+        _currentSessionId = session.sessionId;
+      });
+      print('✅ Session Started. ID: $_currentSessionId');
+    } catch (e) {
+      print('❌ Failed to start session: $e');
+    }
+  }
+
+  // 세션 종료 (POST /session/end)
+  Future<void> _endSessionOnServer() async {
+    if (_currentSessionId == null) return;
+
+    try {
+      await endSession(
+        sessionId: _currentSessionId!,
+        userId: _userId,
+        fullTranscript: _fullTranscript, // 누적된 전체 녹취록 전송
+      );
+      print('✅ Session Ended and Transcript Saved. Full Transcript Length: ${_fullTranscript.length}');
+      _currentSessionId = null; 
+    } catch (e) {
+      print('❌ Failed to end session: $e');
+    }
+  }
+
+  // ===================================
+  // 기존 서비스 로직 및 STT 누적
+  // ===================================
 
   Future<void> _initializeServices() async {
     await _stt.initialize();
@@ -51,6 +99,12 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     _addMessage(welcome, false);
     await _tts.speak(welcome);
     _startListening();
+    
+    // 말동이의 초기 발화도 녹취록에 추가
+    if (_fullTranscript.isNotEmpty) {
+        _fullTranscript += '\n'; 
+    }
+    _fullTranscript += "말동이: $welcome";
   }
 
   void _startListening() async {
@@ -92,16 +146,22 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     });
 
     _silenceTimer?.cancel();
-    await _stt.stop(); 
+    await _stt.stop();
 
     String capturedSpeech = _userSpeech;
     setState(() => _userSpeech = ""); 
 
+    // 사용자 발화 텍스트 누적
+    if (_fullTranscript.isNotEmpty) {
+        _fullTranscript += '\n'; 
+    }
+    _fullTranscript += "사용자: $capturedSpeech"; 
+    
     _addMessage(capturedSpeech, true);
 
     try {
       final response = await http.post(
-        Uri.parse("$baseUrl/dialogue/chat"),
+        Uri.parse("$baseUrl/api/v1/dialogue/chat"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"text": capturedSpeech}),
       );
@@ -109,15 +169,20 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         String maldongAnswer = data['answer'];
+        
+        // 말동이 답변도 녹취록에 누적
+        _fullTranscript += "\n말동이: $maldongAnswer"; 
 
         _addMessage(maldongAnswer, false);
+
         await _tts.speak(maldongAnswer);
-        await Future.delayed(const Duration(milliseconds: 500));
+        
+        await Future.delayed(const Duration(milliseconds: 500)); 
       } else {
-        _addMessage("죄송해요, 잠시 딴생각을 했어요. 다시 말씀해 주시겠어요?", false);
+        _addMessage("서버 응답 오류가 발생했어요.", false);
       }
     } catch (e) {
-      _addMessage("연결이 불안정해요. 와이파이를 확인해 주세요!", false);
+      _addMessage("잠시 연결이 불안정해요.", false);
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
@@ -139,8 +204,16 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     _silenceTimer?.cancel();
     _stt.stop();
     _tts.stop();
+    
+    // 위젯이 닫힐 때 통화 종료 기록
+    _endSessionOnServer(); 
+
     super.dispose();
   }
+  
+  // ===================================
+  // UI 빌드 로직
+  // ===================================
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +255,7 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                "$_userSpeech",
+                _userSpeech,
                 style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
@@ -216,9 +289,8 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
       ),
     );
   }
-} // <--- _MaldongChatOverlayState 클래스 닫기 (여기가 중요합니다!)
+} // <--- _MaldongChatOverlayState 클래스 닫기
 
-// 아래는 독립적인 클래스로 선언됩니다.
 class TypingBubble extends StatefulWidget {
   const TypingBubble({super.key});
   @override
