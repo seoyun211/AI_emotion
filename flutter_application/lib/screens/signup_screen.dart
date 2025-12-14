@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const String baseUrl = 'http://localhost:8000';
+const String baseUrl = 'http://10.0.2.2:8000';
 
 // ============================================
 // 회원가입 화면 - 역할 선택 포함

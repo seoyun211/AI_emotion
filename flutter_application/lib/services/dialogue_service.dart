@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 
 // ✅ 반드시 VideoCallScreen의 baseUrl 과 같게!
-const String apiBaseUrl = 'http://localhost:8000';
+const String apiBaseUrl = 'http://10.0.2.2:8000';
 
 // 말동이 TTS 재생용 (전역으로 하나만 사용)
 final AudioPlayer _ttsPlayer = AudioPlayer();
