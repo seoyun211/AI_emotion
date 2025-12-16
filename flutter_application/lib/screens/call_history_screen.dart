@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'call_detail_screen.dart'; 
+import 'call_detail_screen.dart';
 
 class CallHistoryScreen extends StatefulWidget {
   final int userId;
@@ -36,8 +36,9 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
     });
 
     try {
-      final url = Uri.parse('http://10.0.2.2:8000/api/v1/calls/user/${widget.userId}');
-      
+      final url =
+          Uri.parse('http://localhost:8000/api/v1/calls/user/${widget.userId}');
+
       final response = await http.get(
         url,
         headers: {
@@ -55,14 +56,14 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
             return CallRecord(
               sessionId: call['session_id'],
               date: DateTime.parse(call['start_time']),
-              endTime: call['end_time'] != null 
-                  ? DateTime.parse(call['end_time']) 
+              endTime: call['end_time'] != null
+                  ? DateTime.parse(call['end_time'])
                   : null,
               duration: call['duration_seconds'] != null
                   ? Duration(seconds: call['duration_seconds'])
                   : null,
               // ✅ 녹취록 데이터 파싱 추가
-              fullTranscript: call['full_transcript'], 
+              fullTranscript: call['full_transcript'],
             );
           }).toList();
           _isLoading = false;
@@ -167,7 +168,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
               onPressed: _fetchCallHistory,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF9800),
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               ),
               child: const Text(
                 '다시 시도',
@@ -240,13 +242,13 @@ class _CallHistoryItem extends StatelessWidget {
     final timeFormat = DateFormat('HH:mm');
 
     // ✅ GestureDetector를 사용하여 리스트 항목을 클릭 가능하게 만듭니다.
-    return GestureDetector( 
+    return GestureDetector(
       onTap: () {
         // ✅ 클릭 시 CallDetailScreen으로 이동하며, 녹취록이 담긴 CallRecord 전체를 전달합니다.
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => CallDetailScreen(callRecord: call), 
+            builder: (context) => CallDetailScreen(callRecord: call),
           ),
         );
       },

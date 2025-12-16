@@ -32,7 +32,7 @@ app.add_middleware(
 # ✅ 라우터 포함
 #  - /api/v1/dialogue/speak : 영상통화 + 감정 + LLM + TTS
 app.include_router(dialogue_router, prefix="/api/v1") 
-app.include_router(alerts_router, prefix="/api/v1") 
+app.include_router(alerts_router) 
 app.include_router(users_router)    
 app.include_router(auth_router)     
 app.include_router(guardian_router)

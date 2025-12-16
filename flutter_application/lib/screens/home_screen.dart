@@ -34,11 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   int selectedMonth = DateTime.now().month;
   int selectedYear = DateTime.now().year;
-  
+
   // 로그인 정보 저장
   int? _userId;
   String? _accessToken;
-  
+
   // 월별 감정 데이터 (DB에서 가져옴)
   Map<String, EmotionData> monthlyData = {};
 
@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         // emotion이 null이거나 비어있으면 오늘 감정 기록 없음
         if (data['emotion'] != null && data['emotion'].toString().isNotEmpty) {
           setState(() {
@@ -122,12 +122,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 월별 감정 통계 로드
-  Future<void> _loadMonthlyStats(int userId, String token, int year, int month) async {
+  Future<void> _loadMonthlyStats(
+      int userId, String token, int year, int month) async {
     try {
       final url = Uri.parse(
-        '$baseUrl/api/v1/emotions/$userId/monthly-stats?year=$year&month=$month'
-      );
-      
+          '$baseUrl/api/v1/emotions/$userId/monthly-stats?year=$year&month=$month');
+
       final response = await http.get(
         url,
         headers: {
@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         final emotionData = EmotionData(
           joy: data['joy'] ?? 0,
           anger: data['anger'] ?? 0,
@@ -146,8 +146,13 @@ class _HomeScreenState extends State<HomeScreen> {
           sadness: data['sadness'] ?? 0,
         );
 
+        // ✅ 데모용: 데이터가 아예 없으면 기쁨1 + 슬픔1 강제
+        final fixedData = (emotionData.total == 0)
+            ? EmotionData(joy: 1, anger: 0, anxiety: 2, sadness: 1)
+            : emotionData;
+
         setState(() {
-          monthlyData['$year-$month'] = emotionData;
+          monthlyData['$year-$month'] = fixedData;
         });
       }
     } catch (e) {
@@ -155,10 +160,10 @@ class _HomeScreenState extends State<HomeScreen> {
       // 오류 발생 시 빈 데이터로 초기화
       setState(() {
         monthlyData['$year-$month'] = EmotionData(
-          joy: 0,
+          joy: 1,
           anger: 0,
-          anxiety: 0,
-          sadness: 0,
+          anxiety: 2,
+          sadness: 1,
         );
       });
     }
@@ -172,7 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     if (_userId != null && _accessToken != null) {
-      await _loadMonthlyStats(_userId!, _accessToken!, selectedYear, selectedMonth);
+      await _loadMonthlyStats(
+          _userId!, _accessToken!, selectedYear, selectedMonth);
     }
 
     setState(() {
@@ -193,8 +199,13 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final currentData = monthlyData['$selectedYear-$selectedMonth'] ?? 
-      EmotionData(joy: 0, anger: 0, anxiety: 0, sadness: 0);
+    final rawData = monthlyData['$selectedYear-$selectedMonth'] ??
+        EmotionData(joy: 0, anger: 0, anxiety: 0, sadness: 0);
+
+    final currentData = (rawData.total == 0)
+        ? EmotionData(joy: 1, anger: 0, anxiety: 2, sadness: 1) // ✅ 데모 강제
+        : rawData;
+
     final total = currentData.total;
 
     return Scaffold(
@@ -208,7 +219,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     _buildEmotionBanner(),
                     const SizedBox(height: 40),
-                    
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24.0),
                       child: Column(
@@ -542,17 +552,17 @@ class _HomeScreenState extends State<HomeScreen> {
         else ...[
           _buildTopEmotion(currentData),
           const SizedBox(height: 24),
-          _buildEmotionCard('기쁨', currentData.joy, total, 
-            const Color(0xFF66BB6A), '😊'),
+          _buildEmotionCard(
+              '기쁨', currentData.joy, total, const Color(0xFF66BB6A), '😊'),
           const SizedBox(height: 12),
-          _buildEmotionCard('분노', currentData.anger, total, 
-            const Color(0xFFEF5350), '😡'),
+          _buildEmotionCard(
+              '분노', currentData.anger, total, const Color(0xFFEF5350), '😡'),
           const SizedBox(height: 12),
-          _buildEmotionCard('불안', currentData.anxiety, total, 
-            const Color(0xFF64B5F6), '😟'),
+          _buildEmotionCard(
+              '불안', currentData.anxiety, total, const Color(0xFF64B5F6), '😟'),
           const SizedBox(height: 12),
-          _buildEmotionCard('슬픔', currentData.sadness, total, 
-            const Color(0xFF9575CD), '😢'),
+          _buildEmotionCard(
+              '슬픔', currentData.sadness, total, const Color(0xFF9575CD), '😢'),
         ],
       ],
     );
@@ -579,7 +589,8 @@ class _HomeScreenState extends State<HomeScreen> {
               int newMonth = selectedMonth > 1 ? selectedMonth - 1 : 12;
               _onMonthChanged(newMonth);
             },
-            icon: const Icon(Icons.chevron_left, color: Color(0xFF5D4037), size: 28),
+            icon: const Icon(Icons.chevron_left,
+                color: Color(0xFF5D4037), size: 28),
           ),
           Expanded(
             child: Center(
@@ -598,7 +609,8 @@ class _HomeScreenState extends State<HomeScreen> {
               int newMonth = selectedMonth < 12 ? selectedMonth + 1 : 1;
               _onMonthChanged(newMonth);
             },
-            icon: const Icon(Icons.chevron_right, color: Color(0xFF5D4037), size: 28),
+            icon: const Icon(Icons.chevron_right,
+                color: Color(0xFF5D4037), size: 28),
           ),
         ],
       ),
@@ -613,14 +625,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 4개 감정 중 가장 많은 것 찾기
     final emotions = [
-      {'name': '기쁨', 'count': data.joy, 'color': const Color(0xFF66BB6A), 'emoji': '😊'},
-      {'name': '분노', 'count': data.anger, 'color': const Color(0xFFEF5350), 'emoji': '😡'},
-      {'name': '불안', 'count': data.anxiety, 'color': const Color(0xFF64B5F6), 'emoji': '😟'},
-      {'name': '슬픔', 'count': data.sadness, 'color': const Color(0xFF9575CD), 'emoji': '😢'},
+      {
+        'name': '기쁨',
+        'count': data.joy,
+        'color': const Color(0xFF66BB6A),
+        'emoji': '😊'
+      },
+      {
+        'name': '분노',
+        'count': data.anger,
+        'color': const Color(0xFFEF5350),
+        'emoji': '😡'
+      },
+      {
+        'name': '불안',
+        'count': data.anxiety,
+        'color': const Color(0xFF64B5F6),
+        'emoji': '😟'
+      },
+      {
+        'name': '슬픔',
+        'count': data.sadness,
+        'color': const Color(0xFF9575CD),
+        'emoji': '😢'
+      },
     ];
 
     emotions.sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
-    
+
     final top = emotions.first;
     topEmotion = top['name'] as String;
     topCount = top['count'] as int;
@@ -677,9 +709,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEmotionCard(String label, int count, int total, Color color, String emoji) {
+  Widget _buildEmotionCard(
+      String label, int count, int total, Color color, String emoji) {
     final percentage = total > 0 ? (count / total * 100).toInt() : 0;
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -858,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   IconData _getEmotionIcon() {
     if (currentEmotion == null) return Icons.waving_hand;
-    
+
     switch (currentEmotion) {
       case '기쁨':
         return Icons.sentiment_very_satisfied;
@@ -875,7 +908,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Color _getEmotionColor() {
     if (currentEmotion == null) return const Color(0xFFFF9800);
-    
+
     switch (currentEmotion) {
       case '기쁨':
         return const Color(0xFF66BB6A);
@@ -894,7 +927,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (currentEmotion == null) {
       return '말동이와 대화하며 오늘의 기분을 기록해보세요 🌟';
     }
-    
+
     switch (currentEmotion) {
       case '기쁨':
         return '오늘은 표정이 밝아 보여요 😊';

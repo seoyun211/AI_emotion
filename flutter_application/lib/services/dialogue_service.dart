@@ -11,7 +11,7 @@ import '../models/dialogue_response.dart';
 import '../models/session.dart'; // ✅ Session 모델 임포트
 
 /// 🔗 말동이 백엔드 베이스 URL
-const String baseUrl = "http://10.0.2.2:8000";
+const String baseUrl = "http://localhost:8000";
 
 /// 전역 TTS 플레이어 (한 개만 만들어서 재사용)
 final AudioPlayer maldongTtsPlayer = AudioPlayer();
@@ -56,8 +56,7 @@ Future<DialogueResponse> sendToMaldongAndPlayTts({
   final response = await http.Response.fromStream(streamedResponse);
 
   if (response.statusCode != 200) {
-    throw Exception(
-        "말동이 서버 오류: ${response.statusCode} / ${response.body}");
+    throw Exception("말동이 서버 오류: ${response.statusCode} / ${response.body}");
   }
 
   // 5) JSON 파싱 → DialogueResponse
@@ -89,7 +88,7 @@ Future<void> _playTtsFromBase64(String base64Audio) async {
 /// 통화 시작 시 세션 레코드를 생성하고 session_id를 반환합니다.
 Future<Session> startSession({required int userId}) async {
   final uri = Uri.parse("$baseUrl/api/v1/dialogue/session/start");
-  
+
   // NOTE: 백엔드 라우터는 user_id를 쿼리 파라미터로 받도록 설계되었습니다.
   final response = await http.post(
     uri.replace(queryParameters: {'user_id': userId.toString()}),
@@ -104,10 +103,10 @@ Future<Session> startSession({required int userId}) async {
   }
 
   // SessionResponse 스키마에 따라 응답을 파싱합니다.
-  final Map<String, dynamic> jsonData = jsonDecode(utf8.decode(response.bodyBytes));
+  final Map<String, dynamic> jsonData =
+      jsonDecode(utf8.decode(response.bodyBytes));
   return Session.fromJson(jsonData);
 }
-
 
 // ------------------------------------------------------------------
 // ⭐ 2. 통화 세션 종료 및 녹취록 저장 (POST /dialogue/session/end)
@@ -125,9 +124,9 @@ Future<Session> endSession({
   final queryParams = {
     'session_id': sessionId.toString(),
     'user_id': userId.toString(),
-    'full_transcript': fullTranscript, 
+    'full_transcript': fullTranscript,
   };
-  
+
   final response = await http.post(
     uri.replace(queryParameters: queryParams),
     headers: <String, String>{
@@ -141,6 +140,7 @@ Future<Session> endSession({
   }
 
   // SessionResponse 스키마에 따라 업데이트된 응답을 파싱합니다.
-  final Map<String, dynamic> jsonData = jsonDecode(utf8.decode(response.bodyBytes));
+  final Map<String, dynamic> jsonData =
+      jsonDecode(utf8.decode(response.bodyBytes));
   return Session.fromJson(jsonData);
 }

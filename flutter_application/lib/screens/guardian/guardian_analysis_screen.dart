@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 class GuardianAnalysisScreen extends StatelessWidget {
   final int guardianUserId;
   final String accessToken;
-  final VoidCallback? onOpenSettings;   // ✅ Nullable 로 변경
+  final VoidCallback? onOpenSettings; // ✅ Nullable 로 변경
 
   const GuardianAnalysisScreen({
     super.key,
     required this.guardianUserId,
     required this.accessToken,
-    this.onOpenSettings,                // ✅ 이제 에러 안 남
+    this.onOpenSettings, // ✅ 이제 에러 안 남
   });
 
   @override
@@ -18,7 +18,7 @@ class GuardianAnalysisScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('상세 분석'),
         actions: [
-          if (onOpenSettings != null)   // ✅ null 체크 후 버튼 표시
+          if (onOpenSettings != null) // ✅ null 체크 후 버튼 표시
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: onOpenSettings,
