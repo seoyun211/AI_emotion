@@ -5,8 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../services/web_speech_stt.dart'; // ✅ 조건부 import 진입점
-import '../services/dialogue_service.dart'; // ✅ 세션 저장 함수 사용
+import '../services/web_speech_stt.dart';
 
 class ChatMessage {
   final String text;
@@ -28,7 +27,7 @@ class MaldongChatOverlay extends StatefulWidget {
 
 class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   final List<ChatMessage> _messages = [];
-  final String baseUrl = "http://localhost:8000";
+  final String baseUrl = "http://127.0.0.1:8000";
 
   bool _isProcessing = false;
 
@@ -41,68 +40,24 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
 
   final int _userId = 1; // ✅ 로그인 값으로 교체
 
-  // ✅ 통화 세션/녹취 저장용
-  int? _sessionId;
-  String _fullTranscript = "";
-
   @override
   void initState() {
     super.initState();
     _sayWelcomeMessage();
     _initWebStt();
-    _startSession(); // ✅ 세션 시작
+    // ✅ 세션 시작/종료는 VideoCallScreen에서만 관리(중복 저장 방지)
   }
 
   @override
   void dispose() {
     _silenceTimer?.cancel();
     _webStt.dispose();
-    _endSession(); // ✅ 세션 종료(저장)
     super.dispose();
-  }
-
-  Future<void> _startSession() async {
-    try {
-      final data = await startCallSession(userId: _userId);
-      _sessionId = (data["session_id"] as num?)?.toInt();
-      // ignore: avoid_print
-      print("✅ 세션 시작됨: sessionId=$_sessionId");
-    } catch (e) {
-      // ignore: avoid_print
-      print("❌ 세션 시작 실패: $e");
-    }
-  }
-
-  Future<void> _endSession() async {
-    if (_sessionId == null) return;
-
-    try {
-      await endCallSession(
-        sessionId: _sessionId!,
-        userId: _userId,
-        fullTranscript: _fullTranscript,
-      );
-      // ignore: avoid_print
-      print("✅ 세션 종료/저장 완료: sessionId=$_sessionId");
-    } catch (e) {
-      // ignore: avoid_print
-      print("❌ 세션 종료 실패: $e");
-    }
   }
 
   Future<void> _sayWelcomeMessage() async {
     const welcome = "안녕하세요 저는 말동이입니다. 오늘 하루는 어땠나요?";
     _addMessage(welcome, false);
-
-    // ✅ transcript에도 남기고 싶으면
-    _appendTranscript("말동이", welcome);
-  }
-
-  void _appendTranscript(String speaker, String text) {
-    final line = "$speaker: ${text.trim()}";
-    if (line.trim().isEmpty) return;
-    if (_fullTranscript.isNotEmpty) _fullTranscript += "\n";
-    _fullTranscript += line;
   }
 
   Future<void> _initWebStt() async {
@@ -169,10 +124,13 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     });
 
     _addMessage(trimmed, true);
-    _appendTranscript("사용자", trimmed); // ✅ 유저 발화 저장
 
-    widget.onFinalText?.call(trimmed); // ✅ VideoCallScreen 감정분석 트리거
+    // ✅ VideoCallScreen이 감정분석 + transcript 누적 + DB 저장(종료 시 1번) 담당
+    widget.onFinalText?.call(trimmed);
 
+    // (선택) 여기서 LLM reply만 받아서 채팅 UI에 보여주고 싶으면 유지
+    // ⚠️ 하지만 VideoCallScreen에서도 같은 /dialogue/web를 치면 중복 호출됨.
+    // 지금은 "채팅 UI 표시용"으로만 남겨두되, 서버 호출이 중복이라면 아래 블록을 제거해.
     try {
       final uri = Uri.parse("$baseUrl/api/v1/dialogue/web");
       final req = http.MultipartRequest("POST", uri);
@@ -191,7 +149,6 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
       final reply = (data["llm_reply"] ?? "…").toString();
 
       _addMessage(reply, false);
-      _appendTranscript("말동이", reply); // ✅ 말동이 답변 저장
     } catch (e) {
       _addMessage("잠시 연결이 불안정해요. 마이크/네트워크를 확인해 주세요!", false);
     } finally {
@@ -205,7 +162,7 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     if (_isListening) {
       _webStt.stop();
     } else {
-      _webStt.start(); // ✅ 사용자 클릭 이벤트에서 start
+      _webStt.start();
     }
   }
 

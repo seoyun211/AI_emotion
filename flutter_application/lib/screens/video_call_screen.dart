@@ -12,8 +12,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:ui_web' as ui_web;
 import 'dart:html' as html;
 
-import 'package:http/http.dart' as http; // ✅ 추가
-
 import 'chat_screen.dart';
 import '../services/dialogue_service.dart';
 
@@ -36,7 +34,6 @@ class VideoCallScreen extends StatefulWidget {
 }
 
 class _VideoCallScreenState extends State<VideoCallScreen> {
-  // ====== 기존 ======
   int _seconds = 0;
   Timer? _timer;
 
@@ -61,15 +58,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   late final String _viewType;
 
-  // =========================================================
-  // ✅ [추가] 통화 1번 = 감정 1개 저장 정책용 상태값
-  // =========================================================
-  static const String _baseUrl = "http://127.0.0.1:8000"; // 웹 기준
-  int? _sessionId;                 // ✅ session/start로 받아온 값
-  final List<String> _transcriptLines = []; // ✅ 대화 누적
-  String? _finalEmotion;           // ✅ 통화 종료 시 저장할 "대표 감정" 1개
-  double? _finalRiskScore;         // ✅ 저장 원하면 같이 저장
-  bool _isEnding = false;
+  // ✅ 세션 상태
+  int? _sessionId;
+  bool _isEnding = false; // 종료 진행중 잠금
 
   @override
   void initState() {
@@ -86,8 +77,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _viewType = 'webcam-view-${DateTime.now().millisecondsSinceEpoch}';
     _initWebCamera();
 
-    // ✅ 통화 시작 시 세션 생성
+    // ✅ 통화 시작 → 세션 생성
     _startSession();
+  }
+
+  Future<void> _startSession() async {
+    try {
+      final sid = await startCallSession(userId: widget.userId);
+      if (!mounted) return;
+      setState(() => _sessionId = sid);
+      // ignore: avoid_print
+      print("✅ session/start 성공: session_id=$_sessionId");
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ session/start 실패: $e");
+    }
   }
 
   @override
@@ -97,90 +101,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.dispose();
   }
 
-  // =========================================================
-  // ✅ [추가] 세션 시작/종료 API
-  // =========================================================
-  Future<void> _startSession() async {
-    try {
-      final uri = Uri.parse("$_baseUrl/api/v1/dialogue/session/start?user_id=${widget.userId}");
-      final res = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-        setState(() {
-          _sessionId = data["session_id"] as int?;
-        });
-        // ignore: avoid_print
-        print("✅ session/start 성공: session_id=$_sessionId");
-      } else {
-        // ignore: avoid_print
-        print("❌ session/start 실패: ${res.statusCode} ${utf8.decode(res.bodyBytes)}");
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("❌ session/start 네트워크 오류: $e");
-    }
-  }
-
-  Future<void> _endSessionAndSave() async {
-    if (_isEnding) return;
-    _isEnding = true;
-
-    try {
-      final sid = _sessionId;
-      if (sid == null) {
-        // session_id가 없으면 저장 불가(서버쪽 session_id is not defined 같은 문제도 여기서 드러남)
-        // ignore: avoid_print
-        print("❌ session_id가 null이라 통화 저장 불가. session/start부터 확인 필요");
-        return;
-      }
-
-      final fullTranscript = _transcriptLines.isEmpty
-          ? (_latestSpeechText.isNotEmpty ? _latestSpeechText : "...")
-          : _transcriptLines.join("\n");
-
-      // ✅ final_emotion이 없으면 fallback(그래도 1개는 저장되게)
-      final emotionToSave = _finalEmotion ?? "기쁨";
-      final riskToSave = _finalRiskScore ?? 0.0;
-
-      final uri = Uri.parse("$_baseUrl/api/v1/dialogue/session/end");
-      final res = await http.post(
-        uri,
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          "session_id": sid,
-          "user_id": widget.userId,
-          "full_transcript": fullTranscript,
-          "final_emotion": emotionToSave,  // ✅ 백엔드가 받도록 만들어야 함
-          "risk_score": riskToSave,        // ✅ 옵션
-        }),
-      );
-
-      if (res.statusCode == 200) {
-        // ignore: avoid_print
-        print("✅ session/end 저장 성공");
-      } else {
-        // ignore: avoid_print
-        print("❌ session/end 저장 실패: ${res.statusCode} ${utf8.decode(res.bodyBytes)}");
-      }
-    } catch (e) {
-      // ignore: avoid_print
-      print("❌ session/end 네트워크 오류: $e");
-    } finally {
-      _isEnding = false;
-    }
-  }
-
-  // ====== 기존 ======
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -227,6 +147,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         (int viewId) => v,
       );
 
+      if (!mounted) return;
       setState(() {
         _video = v;
         _stream = s;
@@ -234,10 +155,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _cameraErrorMessage = null;
       });
     } catch (e) {
-      final msg = (e is html.DomException)
-          ? "${e.name}: ${e.message}"
-          : e.toString();
+      final msg = (e is html.DomException) ? "${e.name}: ${e.message}" : e.toString();
 
+      if (!mounted) return;
       setState(() {
         _cameraErrorMessage = "웹캠 실패: $msg";
         _isCameraOn = false;
@@ -259,6 +179,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   void _toggleCamera() {
     if (!kIsWeb) return;
+    if (_isEnding) return; // ✅ 종료 중엔 카메라 토글 금지
 
     if (_isCameraOn) {
       _stopWebCamera();
@@ -284,6 +205,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<List<Uint8List>> _captureFrames5fps() async {
     final frames = <Uint8List>[];
+
     for (int t = 0; t < 5; t++) {
       if (_video != null && _video!.videoWidth > 0 && _video!.videoHeight > 0) break;
       await Future.delayed(const Duration(milliseconds: 200));
@@ -294,15 +216,15 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       if (f != null) frames.add(f);
       await Future.delayed(const Duration(milliseconds: 200));
     }
-
     return frames;
   }
 
-  /// ✅ 말끝날 때만 감정분석 요청 (UI는 계속 업데이트 가능)
+  /// ✅ 말끝날 때만 감정분석 요청
   Future<void> _sendEmotionOnceWithText(String text) async {
     final trimmed = text.trim().isEmpty ? "..." : text.trim();
 
     if (!kIsWeb || !_isCameraOn) return;
+    if (_isEnding) return; // ✅ 종료 중엔 전송 금지
     if (trimmed == _lastSentText) return;
     if (_isSending) return;
 
@@ -313,32 +235,55 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
       _lastSentText = trimmed;
 
-      // ✅ 여기서 응답을 받아서 마지막 감정/점수를 기억해둠 (통화 종료 때 1개만 저장!)
       final data = await sendToMaldongWebAndPlayTts(
         text: trimmed,
         frames: frames,
         userId: widget.userId,
       );
 
-      // ✅ transcript 누적
-      _transcriptLines.add("사용자: $trimmed");
-      final reply = (data["llm_reply"] ?? "").toString();
-      if (reply.isNotEmpty) _transcriptLines.add("말동이: $reply");
-
-      // ✅ final emotion/risk 업데이트 (마지막 값으로 덮어쓰기 = 대표 1개)
-      final e = (data["emotion"] ?? "").toString();
-      if (e.isNotEmpty) _finalEmotion = e;
-
-      final rs = data["risk_score"];
-      if (rs is num) _finalRiskScore = rs.toDouble();
-
       // ignore: avoid_print
-      print("📌 lastEmotion=$_finalEmotion, risk=$_finalRiskScore, lines=${_transcriptLines.length}");
+      print("📌 응답키들: ${data.keys.toList()}");
     } catch (e) {
       // ignore: avoid_print
       print("웹 감정분석 전송 오류: $e");
     } finally {
       _isSending = false;
+    }
+  }
+
+  Future<void> _endSessionAndExit() async {
+    if (_isEnding) return;
+    setState(() => _isEnding = true);
+
+    try {
+      final sid = _sessionId;
+      if (sid == null) {
+        // ignore: avoid_print
+        print("❌ session_id가 null이라 저장 불가. session/start 확인 필요");
+      } else {
+        await endCallSession(sessionId: sid, userId: widget.userId);
+        // ignore: avoid_print
+        print("✅ session/end 저장 성공 (통화 1번 = 감정 1개)");
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ session/end 실패: $e");
+    } finally {
+      // ✅ 항상 카메라/타이머 정리
+      _timer?.cancel();
+      _stopWebCamera();
+
+      if (!mounted) return;
+
+      // ✅ 부모 상태 정리 콜백(필요하면)
+      widget.onEndCall();
+
+      // ✅ 화면 자체 종료(가장 중요)
+      // - 이게 있어야 "VideoCallScreen이 안 끝나는 문제"가 해결됨
+      Navigator.of(context).maybePop();
+
+      // (maybePop이 false인 구조라도 _isEnding 풀어줘야 UI가 안 멈춤)
+      if (mounted) setState(() => _isEnding = false);
     }
   }
 
@@ -394,6 +339,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Widget _circleButton(IconData icon, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         width: 70,
@@ -414,18 +360,29 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _circleButton(_isCameraOn ? Icons.videocam_off : Icons.videocam, _toggleCamera),
         const SizedBox(width: 20),
 
-        // ✅ 종료 버튼: session/end 저장 → 카메라 종료 → 홈으로
+        // ✅ 종료 버튼 (중복 탭 완전 차단)
         GestureDetector(
-          onTap: () async {
-            await _endSessionAndSave(); // ✅ 통화 1번 = 감정 1개 저장 (여기서 1번만!)
-            _stopWebCamera();
-            widget.onEndCall();
-          },
-          child: Container(
-            width: 85,
-            height: 85,
-            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            child: const Center(child: Icon(Icons.call_end, color: Colors.white, size: 38)),
+          behavior: HitTestBehavior.opaque,
+          onTap: _isEnding ? null : _endSessionAndExit,
+          child: AbsorbPointer(
+            absorbing: _isEnding,
+            child: Opacity(
+              opacity: _isEnding ? 0.6 : 1.0,
+              child: Container(
+                width: 85,
+                height: 85,
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                child: Center(
+                  child: _isEnding
+                      ? const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                        )
+                      : const Icon(Icons.call_end, color: Colors.white, size: 38),
+                ),
+              ),
+            ),
           ),
         ),
         const SizedBox(width: 20),
@@ -450,13 +407,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               child: Stack(
                 children: [
                   Positioned.fill(child: Image.asset(_selectedBackground, fit: BoxFit.cover)),
+
+                  // ✅ 아바타가 터치를 가로채지 못하게
                   Positioned.fill(
                     child: IgnorePointer(
-                    ignoring: true,
-                    child: Transform.scale(scale: 0.9, child: widget.avatar),
+                      ignoring: true,
+                      child: Transform.scale(scale: 0.9, child: widget.avatar),
+                    ),
                   ),
-                ),
-
 
                   MaldongChatOverlay(
                     onFinalText: (txt) {
