@@ -145,33 +145,34 @@ def get_monthly_emotion_stats(user_id: int, year: int, month: int):
     try:
         with conn.cursor() as cur:
             sql = """
-            SELECT final_result
-            FROM analysischunk
-            WHERE user_id = %s
-              AND analysis_time >= %s
-              AND analysis_time < %s
+            SELECT a.final_result
+            FROM analysischunk a
+            JOIN Session s ON a.session_id = s.session_id
+            WHERE s.user_id = %s
+              AND a.analysis_time >= %s
+              AND a.analysis_time < %s
             """
             cur.execute(sql, (user_id, start, end))
             rows = cur.fetchall() or []
 
         joy = anger = anxiety = sadness = 0
         for row in rows:
-            e = row["final_result"]
-            if e == "기쁨":
+            if row["final_result"] == "기쁨":
                 joy += 1
-            elif e == "분노":
+            elif row["final_result"] == "분노":
                 anger += 1
-            elif e == "불안":
+            elif row["final_result"] == "불안":
                 anxiety += 1
-            elif e == "슬픔":
+            elif row["final_result"] == "슬픔":
                 sadness += 1
 
-        return EmotionStatsResponse(joy=joy, anger=anger, anxiety=anxiety, sadness=sadness)
+        return EmotionStatsResponse(
+            joy=joy, anger=anger, anxiety=anxiety, sadness=sadness
+        )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"월별 감정 통계 조회 실패: {e}")
     finally:
         conn.close()
+
 
 
 # =========================================================
@@ -180,49 +181,25 @@ def get_monthly_emotion_stats(user_id: int, year: int, month: int):
 # =========================================================
 @router.get("/stats/today-top/{user_id}")
 def get_today_top_emotion(user_id: int):
-    """
-    오늘(로컬 기준) analysischunk.final_result 최다 감정 1개 반환
-    없으면 {"emotion": null, "counts": {...}} 형태로 반환
-    """
-    today = date.today()
-    start = datetime(today.year, today.month, today.day)
-    end = start + timedelta(days=1)
-
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             sql = """
-            SELECT final_result, COUNT(*) AS cnt
+            SELECT final_result, COUNT(*) as cnt
             FROM analysischunk
             WHERE user_id = %s
-              AND analysis_time >= %s
-              AND analysis_time < %s
+              AND DATE(analysis_time) = CURDATE()
             GROUP BY final_result
             ORDER BY cnt DESC
             LIMIT 1
             """
-            cur.execute(sql, (user_id, start, end))
-            top = cur.fetchone()
+            cur.execute(sql, (user_id,))
+            row = cur.fetchone()
 
-            # (선택) 배너 외에도 디버그용 카운트 보고 싶으면 같이 주자
-            sql2 = """
-            SELECT final_result, COUNT(*) AS cnt
-            FROM analysischunk
-            WHERE user_id = %s
-              AND analysis_time >= %s
-              AND analysis_time < %s
-            GROUP BY final_result
-            """
-            cur.execute(sql2, (user_id, start, end))
-            rows = cur.fetchall() or []
-            counts = {r["final_result"]: int(r["cnt"]) for r in rows}
+        if not row:
+            return {"emotion": None}
 
-        return {
-            "emotion": top["final_result"] if top else None,
-            "counts": counts,
-            "date": today.isoformat(),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"오늘 최다 감정 조회 실패: {e}")
+        return {"emotion": row["final_result"]}
+
     finally:
         conn.close()
