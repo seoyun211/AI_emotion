@@ -14,7 +14,7 @@ from routers.guardian import router as guardian_router
 from routers.calls import router as calls_router  
 from routers.analyses import router as analyses_router 
 from routers.web_analyze import router as web_analyze_router
-
+from routers.emotions import router as emotions_router
 
 # -------------------------
 # 🚀 FastAPI 앱 및 미들웨어 설정
@@ -40,6 +40,7 @@ app.include_router(guardian_router)
 app.include_router(calls_router, prefix="/api/v1")    
 app.include_router(analyses_router, prefix="/api/v1")
 app.include_router(web_analyze_router, prefix="/api/v1")
+app.include_router(emotions_router, prefix="/api/v1")
 
 
 # from routers.ensemble import router as ensemble_router

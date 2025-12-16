@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:audioplayers/audioplayers.dart';
 
-const String baseUrl = "http://localhost:8000";
+const String baseUrl = "http://127.0.0.1:8000";
 const String apiPrefix = "/api/v1/dialogue";
 
 final AudioPlayer maldongTtsPlayer = AudioPlayer();
