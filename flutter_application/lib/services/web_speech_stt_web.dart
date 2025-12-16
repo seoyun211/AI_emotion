@@ -1,10 +1,10 @@
 // lib/services/web_speech_stt_web.dart
 // ignore_for_file: avoid_web_libraries_in_flutter
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, VoidCallback;
 import 'dart:html' as html;
 import 'dart:js_util' as jsu;
-import 'package:js/js.dart';
+import 'package:js/js.dart' show allowInterop;
 
 typedef OnText = void Function(String text, bool isFinal);
 
@@ -31,6 +31,7 @@ class WebSpeechSttWeb {
       return;
     }
 
+    // window 객체
     final win = jsu.getProperty(html.window, 'window');
 
     // Chrome/Edge: SpeechRecognition, Safari: webkitSpeechRecognition
@@ -50,7 +51,6 @@ class WebSpeechSttWeb {
     jsu.setProperty(_rec, 'continuous', true);
     jsu.setProperty(_rec, 'interimResults', true);
 
-    // 이벤트 핸들러
     jsu.setProperty(_rec, 'onstart', allowInterop((_) {
       _isListening = true;
       onStart?.call();
@@ -67,20 +67,18 @@ class WebSpeechSttWeb {
       onError?.call(msg);
     }));
 
-    // ✅ 여기 핵심: 타입을 SpeechRecognitionEvent 같은 걸로 잡지 말고 dynamic으로 받기
+    // ✅ 타입은 dynamic으로 받기
     jsu.setProperty(_rec, 'onresult', allowInterop((dynamic e) {
       try {
         final results = jsu.getProperty(e, 'results');
         final len = jsu.getProperty(results, 'length') as int;
         if (len <= 0) return;
 
-        // 마지막 결과를 읽는다
         final lastIndex = len - 1;
         final last = jsu.getProperty(results, lastIndex);
 
         final isFinal = (jsu.getProperty(last, 'isFinal') as bool?) ?? false;
 
-        // last[0].transcript
         final alt0 = jsu.getProperty(last, 0);
         final transcript =
             (jsu.getProperty(alt0, 'transcript')?.toString() ?? '').trim();

@@ -37,7 +37,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
-  // ✅ ChatOverlay에서 넘어온 최신 텍스트
+  // ✅ 최신 텍스트(표시/디버그용)
   String _latestSpeechText = "...";
 
   // ✅ 말끝날 때만 요청 보내기 위한 플래그
@@ -85,9 +85,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.dispose();
   }
 
-  // =========================
-  // ⏱ 타이머
-  // =========================
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -101,9 +98,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  // =========================
-  // 🎥 웹캠 초기화/종료
-  // =========================
   Future<void> _initWebCamera() async {
     try {
       final v = html.VideoElement()
@@ -111,7 +105,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         ..muted = true
         ..style.objectFit = 'cover';
 
-      // ✅ playsInline은 attribute로
       v.setAttribute('playsinline', 'true');
       v.setAttribute('webkit-playsinline', 'true');
 
@@ -162,9 +155,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // =========================
-  // 🖼 프레임 캡처 (toDataUrl 방식: 빨간줄/타입문제 회피)
-  // =========================
   Uint8List? _captureOneFrameJpegSync() {
     final v = _video;
     if (v == null) return null;
@@ -179,7 +169,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Uint8List.fromList(base64Decode(base64Str));
   }
 
-  /// ✅ 1초 동안 5프레임(200ms 간격) 캡처
   Future<List<Uint8List>> _captureFrames5fps() async {
     final frames = <Uint8List>[];
     for (int i = 0; i < 5; i++) {
@@ -190,28 +179,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return frames;
   }
 
-  // =========================
-  // ✅ 말끝날 때(최종 텍스트 들어올 때)만 감정분석 요청
-  // =========================
+  /// ✅ 말끝날 때만(최종 텍스트 들어올 때만) 감정분석 요청
   Future<void> _sendEmotionOnceWithText(String text) async {
     final trimmed = text.trim().isEmpty ? "..." : text.trim();
 
-    // 카메라 없으면 전송 안 함
     if (!kIsWeb || !_isCameraOn) return;
-
-    // 같은 문장 중복 전송 방지
     if (trimmed == _lastSentText) return;
-
     if (_isSending) return;
-    _isSending = true;
 
+    _isSending = true;
     try {
       final frames = await _captureFrames5fps();
       if (frames.isEmpty) return;
 
       _lastSentText = trimmed;
 
-      // ✅ 텍스트 + 프레임(5장) → /dialogue/web
       await sendToMaldongWebAndPlayTts(
         text: trimmed,
         frames: frames,
@@ -225,9 +207,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // =========================
-  // 🖼 UI
-  // =========================
   Widget _buildTimerBox() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -237,11 +216,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       ),
       child: Text(
         _formatTime(_seconds),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -255,10 +230,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(
-              _cameraErrorMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
+            child: Text(_cameraErrorMessage!, style: const TextStyle(color: Colors.white, fontSize: 12)),
           ),
         ),
       );
@@ -269,9 +241,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         width: 120,
         height: 160,
         color: Colors.black87,
-        child: const Center(
-          child: Icon(Icons.videocam_off, color: Colors.white, size: 40),
-        ),
+        child: const Center(child: Icon(Icons.videocam_off, color: Colors.white, size: 40)),
       );
     }
 
@@ -306,12 +276,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _circleButton(
-          _isCameraOn ? Icons.videocam_off : Icons.videocam,
-          _toggleCamera,
-        ),
+        _circleButton(_isCameraOn ? Icons.videocam_off : Icons.videocam, _toggleCamera),
         const SizedBox(width: 20),
-
         GestureDetector(
           onTap: () async {
             _stopWebCamera();
@@ -321,12 +287,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             width: 85,
             height: 85,
             decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            child: const Center(
-              child: Icon(Icons.call_end, color: Colors.white, size: 38),
-            ),
+            child: const Center(child: Icon(Icons.call_end, color: Colors.white, size: 38)),
           ),
         ),
-
         const SizedBox(width: 20),
         _circleButton(Icons.cameraswitch, () {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -347,20 +310,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
-                  Positioned.fill(
-                    child: Image.asset(_selectedBackground, fit: BoxFit.cover),
-                  ),
-                  Positioned.fill(
-                    child: Transform.scale(scale: 0.9, child: widget.avatar),
-                  ),
+                  Positioned.fill(child: Image.asset(_selectedBackground, fit: BoxFit.cover)),
+                  Positioned.fill(child: Transform.scale(scale: 0.9, child: widget.avatar)),
 
-                  // ✅ 여기: 최종 텍스트 들어오면 즉시 감정분석 1회 전송
+                  // ✅ 말 끝나면 여기로 final 텍스트가 옴 → 즉시 5프레임 캡처 후 감정분석 1회
                   MaldongChatOverlay(
                     onFinalText: (txt) {
                       final t = txt.trim().isEmpty ? "..." : txt.trim();
                       setState(() => _latestSpeechText = t);
-
-                      // ✅ 말끝날 때만: 텍스트+5프레임 전송
                       _sendEmotionOnceWithText(t);
                     },
                   ),
