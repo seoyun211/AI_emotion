@@ -53,29 +53,29 @@ def get_image_transform():
 
 class ExpressionNet(nn.Module):
     """
-    훈련할 때 쓴 EfficientNet-B0 구조랑 state_dict 키 맞추기용 래퍼
-    - checkpoint 키: "features.0.0.weight", "classifier.1.weight", ...
+    torchvision EfficientNet-B0 구조에 맞춘 래퍼
+    - classifier는 보통 Sequential(Dropout, Linear)
+    - state_dict 키는 "features.*", "classifier.*" 형태
     """
     def __init__(self, num_classes: int = 4):
         super().__init__()
         base = efficientnet_b0(weights=None)
 
+        # classifier: [Dropout, Linear]
         in_features = base.classifier[1].in_features
         base.classifier[1] = nn.Linear(in_features, num_classes)
 
-        # 🔹 state_dict가 "features.*", "classifier.*" 구조로 나오도록 그대로 꺼내서 멤버로 사용
         self.features = base.features
         self.avgpool = base.avgpool
-        self.dropout = base.dropout
-        self.classifier = base.classifier
+        self.classifier = base.classifier  # ✅ dropout 포함된 전체 classifier를 그대로 사용
 
     def forward(self, x):
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.dropout(x)
-        x = self.classifier(x)
+        x = self.classifier(x)  # ✅ dropout + linear 한번에 처리
         return x
+
 
 
 _face_model: Optional[ExpressionNet] = None

@@ -17,9 +17,10 @@ class ProbabilitiesDict(TypedDict):
 
 
 class ModalityResult(TypedDict):
-    label: str  # "기쁨" 등
-    id: int     # 0~3
+    label: str           # 예측된 감정 라벨 ("기쁨" 등)
+    id: int              # 라벨 인덱스 (0~3)
     probabilities: ProbabilitiesDict
+    risk_score: float    # 위험도 점수 (0~100)
 
 
 class EnsembleResult(TypedDict):
@@ -68,6 +69,32 @@ class EnsembleEmotionModel:
         """[4] 리스트 → 라벨 이름 dict로 변환."""
         return {LABELS[i]: float(vec[i]) for i in range(4)}  # type: ignore[return-value]
 
+    @staticmethod
+    def _calculate_risk_score(prob_dict: ProbabilitiesDict) -> float:
+        """
+        감정 확률 기반 위험도 점수 계산 (0.0 ~ 100.0)
+        
+        [가중치 설정 변경]
+          - 슬픔: 0.85 (가장 높음)
+          - 불안: 0.8
+          - 분노: 0.4
+          - 기쁨: 0.1
+        """
+        w_sadness = 0.85
+        w_anxiety = 0.8
+        w_anger = 0.4
+        w_joy = 0.1
+
+        score = (
+            prob_dict["슬픔"] * w_sadness
+            + prob_dict["불안"] * w_anxiety
+            + prob_dict["분노"] * w_anger
+            + prob_dict["기쁨"] * w_joy
+        )
+        
+        # 0~1 사이의 score를 100점 만점으로 환산
+        return round(score * 100, 2)
+
     # ---------------- 공개 API ---------------- #
 
     def predict(
@@ -86,9 +113,9 @@ class EnsembleEmotionModel:
         -------
         EnsembleResult
           {
-            "final": { "label": ..., "id": 0~3, "probabilities": {...} },
+            "final": { "label": ..., "id": ..., "probabilities": ..., "risk_score": ... },
             "per_modality": {
-              "image": {...}, "text": {...}, "audio": {...}
+              "image": { ... }, "text": { ... }, "audio": { ... }
             }
           }
         """
@@ -117,32 +144,42 @@ class EnsembleEmotionModel:
         final_idx = max(range(4), key=lambda i: p_final[i])
         final_label = LABELS[final_idx]
 
-        # 4. 각 모달별 최상 감정
+        # 4. 각 모달별 최상 감정 인덱스
         img_idx = max(range(4), key=lambda i: v_img[i])
         text_idx = max(range(4), key=lambda i: v_text[i])
         audio_idx = max(range(4), key=lambda i: v_audio[i])
+
+        # 5. 확률 딕셔너리 및 리스크 스코어 계산
+        final_probs = self._to_prob_dict(p_final)
+        img_probs = self._to_prob_dict(v_img)
+        text_probs = self._to_prob_dict(v_text)
+        audio_probs = self._to_prob_dict(v_audio)
 
         result: EnsembleResult = {
             "final": {
                 "label": final_label,
                 "id": final_idx,
-                "probabilities": self._to_prob_dict(p_final),
+                "probabilities": final_probs,
+                "risk_score": self._calculate_risk_score(final_probs),
             },
             "per_modality": {
                 "image": {
                     "label": LABELS[img_idx],
                     "id": img_idx,
-                    "probabilities": self._to_prob_dict(v_img),
+                    "probabilities": img_probs,
+                    "risk_score": self._calculate_risk_score(img_probs),
                 },
                 "text": {
                     "label": LABELS[text_idx],
                     "id": text_idx,
-                    "probabilities": self._to_prob_dict(v_text),
+                    "probabilities": text_probs,
+                    "risk_score": self._calculate_risk_score(text_probs),
                 },
                 "audio": {
                     "label": LABELS[audio_idx],
                     "id": audio_idx,
-                    "probabilities": self._to_prob_dict(v_audio),
+                    "probabilities": audio_probs,
+                    "risk_score": self._calculate_risk_score(audio_probs),
                 },
             },
         }

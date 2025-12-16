@@ -13,6 +13,7 @@ from routers.auth import router as auth_router
 from routers.guardian import router as guardian_router
 from routers.calls import router as calls_router  
 from routers.analyses import router as analyses_router 
+from routers.web_analyze import router as web_analyze_router
 
 
 # -------------------------
@@ -38,6 +39,8 @@ app.include_router(auth_router)
 app.include_router(guardian_router)
 app.include_router(calls_router, prefix="/api/v1")    
 app.include_router(analyses_router, prefix="/api/v1")
+app.include_router(web_analyze_router, prefix="/api/v1")
+
 
 # from routers.ensemble import router as ensemble_router
 # app.include_router(ensemble_router)

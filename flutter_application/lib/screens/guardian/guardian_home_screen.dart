@@ -28,9 +28,6 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   bool isLoading = true;
   String? errorMessage;
 
-  // static const String baseUrl = 'http://10.0.2.2:8000';
-  static const String baseUrl = 'http://localhost:8000';
-
   List<DailyEmotion> recentEmotions = [];
   EmotionStats? emotionStats;
 
@@ -66,8 +63,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
   Future<void> _getWardInfo() async {
     try {
       final response = await http.get(
-        Uri.parse(
-            '$baseUrl/api/v1/guardian/ward-info/${widget.guardianUserId}'),
+        Uri.parse('baseUrl/api/v1/guardian/ward-info/${widget.guardianUserId}'),
         headers: {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
@@ -93,7 +89,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/api/v1/guardian/ward-emotions/${widget.guardianUserId}?days=30'),
+            'baseUrl/api/v1/guardian/ward-emotions/${widget.guardianUserId}?days=30'),
         headers: {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
@@ -128,7 +124,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/api/v1/guardian/emotion-stats/${widget.guardianUserId}?days=30'),
+            'baseUrl/api/v1/guardian/emotion-stats/${widget.guardianUserId}?days=30'),
         headers: {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
@@ -217,7 +213,7 @@ class _GuardianHomeScreenState extends State<GuardianHomeScreen> {
     final stats =
         (apiStats.joy + apiStats.anger + apiStats.anxiety + apiStats.sadness ==
                 0)
-            ? EmotionStats(joy: 1, anger: 0, anxiety: 1, sadness: 1)
+            ? EmotionStats(joy: 1, anger: 0, anxiety: 0, sadness: 0)
             : apiStats;
 
     final todayEmotion = recentEmotions.isNotEmpty
