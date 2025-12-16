@@ -39,7 +39,7 @@ app.include_router(users_router)     # users_router가 내부에 /api/v1/users�
 app.include_router(auth_router)      # auth_router가 내부에 /api/v1/auth면 prefix 빼
 app.include_router(guardian_router)  # guardian_router가 내부에 /api/v1/guardian면 prefix 빼
 app.include_router(web_analyze_router, prefix="/api/v1")  # 얘가 router에 prefix가 없으면 여기서 붙여
-
+app.include_router(analyses_router, prefix="/api/v1")
 
 
 # from routers.ensemble import router as ensemble_router

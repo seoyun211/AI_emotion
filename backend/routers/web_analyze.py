@@ -10,7 +10,6 @@ from models.clients.text_client import predict_text_probs
 from services.llm_service import get_llm_response
 from services.tts_service import tts_synthesize_to_bytes
 
-
 router = APIRouter(prefix="/web", tags=["web-analyze"])
 
 EMOTION_LABELS = ["기쁨", "분노", "불안", "슬픔"]
@@ -40,24 +39,18 @@ async def analyze_web(
     - TTS 음성 생성
     """
     try:
-        # --------------------------------------------------
         # 1) 프레임 bytes
-        # --------------------------------------------------
         frame_bytes_list: List[bytes] = []
         for f in frames:
             b = await f.read()
             if b:
                 frame_bytes_list.append(b)
 
-        # --------------------------------------------------
         # 2) 감정 확률
-        # --------------------------------------------------
-        p_img = predict_face_probs_from_frames(frame_bytes_list) if frame_bytes_list else [0.25]*4
-        p_txt = predict_text_probs(text) if text else [0.25]*4
+        p_img = predict_face_probs_from_frames(frame_bytes_list) if frame_bytes_list else [0.25] * 4
+        p_txt = predict_text_probs(text) if text else [0.25] * 4
 
-        # --------------------------------------------------
         # 3) 앙상블 (웹: 이미지 0.6, 텍스트 0.4)
-        # --------------------------------------------------
         w_img, w_txt = 0.6, 0.4
         p_final = (np.array(p_img) * w_img + np.array(p_txt) * w_txt).tolist()
 
@@ -65,32 +58,38 @@ async def analyze_web(
         risk_score = emotion_to_risk(final_emotion)
         confidence = float(max(p_final))
 
-        # --------------------------------------------------
-        # 4) ✅ LLM 답변 생성
-        # --------------------------------------------------
-        llm_reply = get_llm_response(
-            user_text=text,
-            emotion=final_emotion,
-            confidence=confidence,
-            risk_score=risk_score,
-            ensemble_detail={
-                "p_img": p_img,
-                "p_text": p_txt,
-                "p_final": p_final,
-            },
-        )
+        # ✅ 디버그는 여기(함수 안)에서만
+        # print("[WEB_ANALYZE]", final_emotion, risk_score, confidence)
 
-        # --------------------------------------------------
-        # 5) ✅ TTS 생성 → base64
-        # --------------------------------------------------
+        # 4) LLM 답변 생성
+        # text가 비어있으면 기본 멘트
+        if not text.strip():
+            llm_reply = "괜찮아요. 천천히 말씀해 주셔도 돼요. 오늘 기분은 어떠신가요?"
+        else:
+            llm_reply = get_llm_response(
+                user_text=text,
+                emotion=final_emotion,
+                confidence=confidence,
+                risk_score=risk_score,
+                ensemble_detail={
+                    "p_img": p_img,
+                    "p_text": p_txt,
+                    "p_final": p_final,
+                },
+            )
+
+        # 5) TTS 생성 → base64
         tts_audio_base64 = ""
-        tts_bytes = await tts_synthesize_to_bytes(llm_reply)
-        if tts_bytes:
-            tts_audio_base64 = base64.b64encode(tts_bytes).decode("utf-8")
+        try:
+            tts_bytes = await tts_synthesize_to_bytes(llm_reply)
+            if tts_bytes:
+                tts_audio_base64 = base64.b64encode(tts_bytes).decode("utf-8")
+        except Exception as tts_err:
+            # TTS 실패해도 대답 텍스트는 반환
+            print(f"[TTS 오류] {tts_err}")
+            tts_audio_base64 = ""
 
-        # --------------------------------------------------
         # 6) 응답
-        # --------------------------------------------------
         return {
             "user_id": user_id,
             "text": text,
@@ -104,22 +103,9 @@ async def analyze_web(
             "confidence": confidence,
             "risk_score": risk_score,
 
-            # ✅ 핵심
             "llm_reply": llm_reply,
             "tts_audio_base64": tts_audio_base64,
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"web analyze 실패: {e}")
-    
-print("[WEB_ANALYZE] final_emotion=", final_emotion, "risk=", risk_score, "conf=", confidence)
-print("[WEB_ANALYZE] calling LLM...")
-llm_reply = get_llm_response(
-    user_text=text,
-    emotion=final_emotion,
-    confidence=confidence,
-    risk_score=risk_score,
-    ensemble_detail={"p_img": p_img, "p_text": p_txt, "p_final": p_final},
-)
-print("[WEB_ANALYZE] LLM reply=", llm_reply)
-

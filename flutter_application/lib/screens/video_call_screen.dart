@@ -37,7 +37,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
-  String _latestSpeechText = "...";
   bool _isSending = false;
   String _lastSentText = "";
 
@@ -58,9 +57,12 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   late final String _viewType;
 
+  // ✅ 채팅 컨트롤러
+  final MaldongChatController _chatController = MaldongChatController();
+
   // ✅ 세션 상태
   int? _sessionId;
-  bool _isEnding = false; // 종료 진행중 잠금
+  bool _isEnding = false;
 
   @override
   void initState() {
@@ -77,7 +79,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     _viewType = 'webcam-view-${DateTime.now().millisecondsSinceEpoch}';
     _initWebCamera();
 
-    // ✅ 통화 시작 → 세션 생성
     _startSession();
   }
 
@@ -179,7 +180,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   void _toggleCamera() {
     if (!kIsWeb) return;
-    if (_isEnding) return; // ✅ 종료 중엔 카메라 토글 금지
+    if (_isEnding) return;
 
     if (_isCameraOn) {
       _stopWebCamera();
@@ -219,16 +220,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return frames;
   }
 
-  /// ✅ 말끝날 때만 감정분석 요청
+  /// ✅ 말끝날 때만 감정분석 요청 + 말동이 "생각중" 표시
   Future<void> _sendEmotionOnceWithText(String text) async {
     final trimmed = text.trim().isEmpty ? "..." : text.trim();
 
     if (!kIsWeb || !_isCameraOn) return;
-    if (_isEnding) return; // ✅ 종료 중엔 전송 금지
+    if (_isEnding) return;
     if (trimmed == _lastSentText) return;
     if (_isSending) return;
 
     _isSending = true;
+
+    // ✅ “대답중” 말풍선 ON + 최소 표시시간 확보(깜빡임 방지)
+    final startAt = DateTime.now();
+    _chatController.setTyping(true);
+
     try {
       final frames = await _captureFrames5fps();
       if (frames.isEmpty) return;
@@ -241,12 +247,34 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         userId: widget.userId,
       );
 
+      // ✅ 여기다 추가하면 됨 (data 받은 직후)
+      print("🖼 p_img=${data['p_img']}");
+      print("📝 p_text=${data['p_text']}");
+      print("🎯 p_final=${data['p_final']}");
+      print("✅ final_emotion=${data['final_emotion']}, conf=${data['confidence']}, risk=${data['risk_score']}");
+
+      final reply = (data["llm_reply"] ?? "").toString().trim();
+      if (reply.isNotEmpty) {
+        _chatController.addBotMessage(reply);
+      } else {
+        // ignore: avoid_print
+        print("⚠️ llm_reply 비어있음. keys=${data.keys.toList()}");
+        _chatController.addBotMessage("음… 다시 한번 말씀해 주실래요?");
+      }
+
       // ignore: avoid_print
       print("📌 응답키들: ${data.keys.toList()}");
     } catch (e) {
       // ignore: avoid_print
       print("웹 감정분석 전송 오류: $e");
+      _chatController.addBotMessage("죄송해요, 지금은 연결이 불안정해요. 다시 한번 말해주실래요?");
     } finally {
+      // ✅ 최소 400ms는 “생각중” 보이게
+      final elapsed = DateTime.now().difference(startAt);
+      final remain = 400 - elapsed.inMilliseconds;
+      if (remain > 0) await Future.delayed(Duration(milliseconds: remain));
+
+      _chatController.setTyping(false);
       _isSending = false;
     }
   }
@@ -269,20 +297,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       // ignore: avoid_print
       print("❌ session/end 실패: $e");
     } finally {
-      // ✅ 항상 카메라/타이머 정리
       _timer?.cancel();
       _stopWebCamera();
 
       if (!mounted) return;
 
-      // ✅ 부모 상태 정리 콜백(필요하면)
       widget.onEndCall();
 
-      // ✅ 화면 자체 종료(가장 중요)
-      // - 이게 있어야 "VideoCallScreen이 안 끝나는 문제"가 해결됨
-      Navigator.of(context).maybePop();
+      final nav = Navigator.of(context);
+      if (nav.canPop()) {
+        nav.pop();
+      } else {
+        nav.maybePop();
+      }
 
-      // (maybePop이 false인 구조라도 _isEnding 풀어줘야 UI가 안 멈춤)
       if (mounted) setState(() => _isEnding = false);
     }
   }
@@ -360,7 +388,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _circleButton(_isCameraOn ? Icons.videocam_off : Icons.videocam, _toggleCamera),
         const SizedBox(width: 20),
 
-        // ✅ 종료 버튼 (중복 탭 완전 차단)
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _isEnding ? null : _endSessionAndExit,
@@ -408,7 +435,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 children: [
                   Positioned.fill(child: Image.asset(_selectedBackground, fit: BoxFit.cover)),
 
-                  // ✅ 아바타가 터치를 가로채지 못하게
                   Positioned.fill(
                     child: IgnorePointer(
                       ignoring: true,
@@ -417,9 +443,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                   ),
 
                   MaldongChatOverlay(
+                    controller: _chatController,
                     onFinalText: (txt) {
                       final t = txt.trim().isEmpty ? "..." : txt.trim();
-                      setState(() => _latestSpeechText = t);
                       _sendEmotionOnceWithText(t);
                     },
                   ),
