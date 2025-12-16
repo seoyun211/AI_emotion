@@ -1,12 +1,14 @@
 # backend/routers/dialogue.py
-
 from __future__ import annotations
+
 from typing import List, Optional
 from io import BytesIO
 import base64
+from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 import speech_recognition as sr
 from pydub import AudioSegment
@@ -15,12 +17,13 @@ from services.emotion_service import process_emotion_analysis
 from services.llm_service import get_llm_response
 from services.tts_service import tts_synthesize_to_bytes
 
+from database.crud import SessionCRUD  # ✅ 너가 올린 crud.py의 SessionCRUD 사용
+
 router = APIRouter(prefix="/dialogue", tags=["Dialogue"])
 
 
 # =========================================================
 # ✅ 1) 모바일/에뮬 실시간: 오디오 + 프레임
-#    (네가 준 코드 그대로 유지)
 # =========================================================
 @router.post("/speak")
 async def handle_user_speech(
@@ -36,7 +39,6 @@ async def handle_user_speech(
         original_bytes = await audio_file.read()
         print(f"  - audio_file bytes: {len(original_bytes)}")
 
-        # m4a 등 -> wav 변환
         audio_segment = AudioSegment.from_file(BytesIO(original_bytes))
         wav_buffer = BytesIO()
         audio_segment.export(wav_buffer, format="wav")
@@ -113,9 +115,7 @@ async def handle_user_speech(
 
 
 # =========================================================
-# ✅ 2) 웹(Flutter Web) 1단계: 텍스트 + 프레임(5장)만
-#    - 오디오/ STT 없음
-#    - 프레임은 5fps로 캡처해서 frames로 보내면 됨
+# ✅ 2) 웹(Flutter Web): 텍스트 + 프레임(5장)
 # =========================================================
 @router.post("/web")
 async def handle_web_input(
@@ -126,17 +126,15 @@ async def handle_web_input(
     print("[/dialogue/web] ✅ 요청 들어옴")
     print(f"  - user_id: {user_id}, frames: {len(frames)}, text_len: {len(text)}")
 
-    # 1) 프레임 bytes 리스트
     frame_bytes_list: Optional[List[bytes]] = None
     if frames:
         frame_bytes_list = [await f.read() for f in frames]
 
-    # 2) 감정 분석 (✅ 오디오 없음)
     analysis_result = await process_emotion_analysis(
         text=text if text.strip() else "...",
         user_id=user_id,
         image_frames=frame_bytes_list,
-        audio_bytes=None,   # ✅ 웹 1단계는 오디오 없음
+        audio_bytes=None,
     )
 
     emotion = analysis_result["emotion"]
@@ -144,7 +142,6 @@ async def handle_web_input(
     risk_score = float(analysis_result["risk_score"])
     ensemble_detail = analysis_result.get("ensemble_detail")
 
-    # 3) LLM 답변
     llm_reply = get_llm_response(
         user_text=text if text.strip() else "...",
         emotion=emotion,
@@ -153,7 +150,6 @@ async def handle_web_input(
         ensemble_detail=ensemble_detail,
     )
 
-    # 4) TTS (선택)
     tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
     tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8") if tts_audio_bytes else ""
 
@@ -171,3 +167,65 @@ async def handle_web_input(
             "timestamp": str(analysis_result.get("timestamp")),
         }
     )
+
+
+# =========================================================
+# ✅ 3) 통화 세션 저장 (start/end) + 통화목록 조회
+#    - Flutter CallHistoryScreen과 경로 맞춤
+# =========================================================
+class EndSessionBody(BaseModel):
+    session_id: int
+    user_id: int
+    full_transcript: str
+
+
+@router.post("/session/start")
+def start_session(user_id: int):
+    now = datetime.now()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    session_id = SessionCRUD.create_session(
+        user_id=user_id,
+        start_time=now_str,
+        end_time=None,
+        duration_seconds=None,
+        full_transcript=None,
+    )
+    if session_id is None:
+        raise HTTPException(status_code=500, detail="통화 세션 시작 기록 생성 실패")
+
+    return {
+        "session_id": session_id,
+        "user_id": user_id,
+        "start_time": now,
+        "end_time": None,
+        "duration_seconds": None,
+        "full_transcript": None,
+    }
+
+
+@router.post("/session/end")
+def end_session(body: EndSessionBody):
+    now = datetime.now()
+    now_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    ok = SessionCRUD.update_session(
+        session_id=body.session_id,
+        end_time=now_str,
+        full_transcript=body.full_transcript,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="세션 업데이트 실패")
+
+    updated = SessionCRUD.get_session_by_id(body.session_id)
+    if updated is None:
+        raise HTTPException(status_code=500, detail="세션 종료 후 데이터 조회 실패")
+
+    return updated
+
+
+# ✅ CallHistoryScreen이 GET /api/v1/calls/user/{id} 호출하니까 맞춰줌
+@router.get("/calls/user/{user_id}")
+def get_calls_by_user(user_id: int):
+    calls = SessionCRUD.get_sessions_by_user_id(user_id)
+    return {"calls": calls}

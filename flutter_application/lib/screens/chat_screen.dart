@@ -5,9 +5,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../services/web_speech_stt_web.dart';
 import '../services/web_speech_stt.dart'; // ✅ 조건부 import 진입점
-
+import '../services/dialogue_service.dart'; // ✅ 세션 저장 함수 사용
 
 class ChatMessage {
   final String text;
@@ -33,7 +32,6 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
 
   bool _isProcessing = false;
 
-  // ✅ 웹 STT
   final WebSpeechStt _webStt = WebSpeechStt();
   bool _sttReady = false;
   bool _isListening = false;
@@ -43,23 +41,68 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
 
   final int _userId = 1; // ✅ 로그인 값으로 교체
 
+  // ✅ 통화 세션/녹취 저장용
+  int? _sessionId;
+  String _fullTranscript = "";
+
   @override
   void initState() {
     super.initState();
     _sayWelcomeMessage();
     _initWebStt();
+    _startSession(); // ✅ 세션 시작
   }
 
   @override
   void dispose() {
     _silenceTimer?.cancel();
     _webStt.dispose();
+    _endSession(); // ✅ 세션 종료(저장)
     super.dispose();
+  }
+
+  Future<void> _startSession() async {
+    try {
+      final data = await startCallSession(userId: _userId);
+      _sessionId = (data["session_id"] as num?)?.toInt();
+      // ignore: avoid_print
+      print("✅ 세션 시작됨: sessionId=$_sessionId");
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ 세션 시작 실패: $e");
+    }
+  }
+
+  Future<void> _endSession() async {
+    if (_sessionId == null) return;
+
+    try {
+      await endCallSession(
+        sessionId: _sessionId!,
+        userId: _userId,
+        fullTranscript: _fullTranscript,
+      );
+      // ignore: avoid_print
+      print("✅ 세션 종료/저장 완료: sessionId=$_sessionId");
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ 세션 종료 실패: $e");
+    }
   }
 
   Future<void> _sayWelcomeMessage() async {
     const welcome = "안녕하세요 저는 말동이입니다. 오늘 하루는 어땠나요?";
     _addMessage(welcome, false);
+
+    // ✅ transcript에도 남기고 싶으면
+    _appendTranscript("말동이", welcome);
+  }
+
+  void _appendTranscript(String speaker, String text) {
+    final line = "$speaker: ${text.trim()}";
+    if (line.trim().isEmpty) return;
+    if (_fullTranscript.isNotEmpty) _fullTranscript += "\n";
+    _fullTranscript += line;
   }
 
   Future<void> _initWebStt() async {
@@ -89,7 +132,6 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
       print("Web STT error: $err");
     };
 
-    // ✅ 여기 중요: onText 사용
     _webStt.onText = (text, isFinal) {
       if (!mounted) return;
 
@@ -127,9 +169,9 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     });
 
     _addMessage(trimmed, true);
+    _appendTranscript("사용자", trimmed); // ✅ 유저 발화 저장
 
-    // ✅ VideoCallScreen으로 전달(감정분석 요청 트리거)
-    widget.onFinalText?.call(trimmed);
+    widget.onFinalText?.call(trimmed); // ✅ VideoCallScreen 감정분석 트리거
 
     try {
       final uri = Uri.parse("$baseUrl/api/v1/dialogue/web");
@@ -147,7 +189,9 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
 
       final data = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
       final reply = (data["llm_reply"] ?? "…").toString();
+
       _addMessage(reply, false);
+      _appendTranscript("말동이", reply); // ✅ 말동이 답변 저장
     } catch (e) {
       _addMessage("잠시 연결이 불안정해요. 마이크/네트워크를 확인해 주세요!", false);
     } finally {
@@ -161,16 +205,13 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
     if (_isListening) {
       _webStt.stop();
     } else {
-      // ✅ 브라우저 정책상 “사용자 클릭”에서 start 하는 게 안전
-      _webStt.start();
+      _webStt.start(); // ✅ 사용자 클릭 이벤트에서 start
     }
   }
 
   void _addMessage(String text, bool isUser) {
     if (!mounted) return;
-    setState(() {
-      _messages.add(ChatMessage(text: text, isUser: isUser));
-    });
+    setState(() => _messages.add(ChatMessage(text: text, isUser: isUser)));
   }
 
   @override

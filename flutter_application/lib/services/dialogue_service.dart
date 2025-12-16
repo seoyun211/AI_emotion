@@ -6,8 +6,6 @@ import 'package:http_parser/http_parser.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 const String baseUrl = "http://localhost:8000";
-
-// ✅ chat_screen이 쓰는 것과 똑같이!
 const String apiPrefix = "/api/v1/dialogue";
 
 final AudioPlayer maldongTtsPlayer = AudioPlayer();
@@ -19,7 +17,6 @@ Future<Map<String, dynamic>> sendToMaldongWeb({
 }) async {
   final uri = Uri.parse("$baseUrl$apiPrefix/web");
 
-  // ✅ 디버그: 지금 정확히 어디로 쏘는지 로그 찍어봐
   // ignore: avoid_print
   print("📌 sendToMaldongWeb => $uri, frames=${frames.length}, textLen=${text.length}");
 
@@ -43,9 +40,7 @@ Future<Map<String, dynamic>> sendToMaldongWeb({
   final response = await http.Response.fromStream(streamed);
 
   if (response.statusCode != 200) {
-    throw Exception(
-      "웹 감정분석 실패: ${response.statusCode}\n${utf8.decode(response.bodyBytes)}",
-    );
+    throw Exception("웹 감정분석 실패: ${response.statusCode}\n${utf8.decode(response.bodyBytes)}");
   }
 
   return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -64,6 +59,40 @@ Future<Map<String, dynamic>> sendToMaldongWebAndPlayTts({
     await maldongTtsPlayer.stop();
     await maldongTtsPlayer.play(BytesSource(bytes));
   }
-
   return data;
+}
+
+// ===========================
+// ✅ 세션 저장 (start/end)
+// ===========================
+Future<Map<String, dynamic>> startCallSession({required int userId}) async {
+  final uri = Uri.parse("$baseUrl$apiPrefix/session/start?user_id=$userId");
+  final res = await http.post(uri);
+
+  if (res.statusCode != 200) {
+    throw Exception("세션 시작 실패: ${res.statusCode}\n${utf8.decode(res.bodyBytes)}");
+  }
+  return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+}
+
+Future<Map<String, dynamic>> endCallSession({
+  required int sessionId,
+  required int userId,
+  required String fullTranscript,
+}) async {
+  final uri = Uri.parse("$baseUrl$apiPrefix/session/end");
+  final res = await http.post(
+    uri,
+    headers: {"Content-Type": "application/json"},
+    body: jsonEncode({
+      "session_id": sessionId,
+      "user_id": userId,
+      "full_transcript": fullTranscript,
+    }),
+  );
+
+  if (res.statusCode != 200) {
+    throw Exception("세션 종료 실패: ${res.statusCode}\n${utf8.decode(res.bodyBytes)}");
+  }
+  return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
 }
