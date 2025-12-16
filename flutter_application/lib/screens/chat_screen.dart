@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../services/web_speech_stt_web.dart';
+import '../services/web_speech_stt.dart'; // ✅ 조건부 import 진입점
+
 
 class ChatMessage {
   final String text;
@@ -32,7 +34,7 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   bool _isProcessing = false;
 
   // ✅ 웹 STT
-  final WebSpeechSttWeb _webStt = WebSpeechSttWeb();
+  final WebSpeechStt _webStt = WebSpeechStt();
   bool _sttReady = false;
   bool _isListening = false;
 

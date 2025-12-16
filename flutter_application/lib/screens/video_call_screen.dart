@@ -9,7 +9,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web; // ✅ 이거 추가 (웹 전용)
 import 'dart:html' as html;
 
 import 'chat_screen.dart';
@@ -98,42 +98,65 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _initWebCamera() async {
-    try {
-      final v = html.VideoElement()
-        ..autoplay = true
-        ..muted = true
-        ..style.objectFit = 'cover';
+Future<void> _initWebCamera() async {
+  try {
+    // 🔥 혹시 남아있는 이전 스트림 정리
+    _stopWebCamera();
 
-      v.setAttribute('playsinline', 'true');
-      v.setAttribute('webkit-playsinline', 'true');
+    final v = html.VideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..style.objectFit = 'cover'
+      ..style.width = '100%'
+      ..style.height = '100%';
 
-      final s = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {'facingMode': 'user'},
-        'audio': false,
-      });
+    // iOS / Safari / Chrome 대응
+    v.setAttribute('playsinline', 'true');
+    v.setAttribute('webkit-playsinline', 'true');
 
-      v.srcObject = s;
-      await v.play();
+    final s = await html.window.navigator.mediaDevices!.getUserMedia({
+      'video': {
+        'facingMode': {'ideal': 'user'},
+        'width': {'ideal': 640},
+        'height': {'ideal': 480},
+      },
+      'audio': false,
+    });
 
-      ui.platformViewRegistry.registerViewFactory(
-        _viewType,
-        (int viewId) => v,
-      );
+    v.srcObject = s;
 
-      setState(() {
-        _video = v;
-        _stream = s;
-        _isCameraOn = true;
-        _cameraErrorMessage = null;
-      });
-    } catch (e) {
-      setState(() {
-        _cameraErrorMessage = "웹캠 권한/접근 실패: $e";
-        _isCameraOn = false;
-      });
-    }
+    // 🔥 메타데이터 로딩 기다림 (이게 핵심)
+    await v.onLoadedMetadata.first;
+    await v.play();
+
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(
+      _viewType,
+      (int viewId) => v,
+    );
+
+    setState(() {
+      _video = v;
+      _stream = s;
+      _isCameraOn = true;
+      _cameraErrorMessage = null;
+    });
+  } catch (e) {
+    final msg = (e is html.DomException)
+        ? "${e.name}: ${e.message}"
+        : e.toString();
+
+    setState(() {
+      _cameraErrorMessage = "웹캠 실패: $msg";
+      _isCameraOn = false;
+    });
+
+    // 콘솔 로그
+    // ignore: avoid_print
+    print("웹캠 실패 상세: $msg");
   }
+}
+
 
   void _stopWebCamera() {
     try {
@@ -171,11 +194,17 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Future<List<Uint8List>> _captureFrames5fps() async {
     final frames = <Uint8List>[];
+    for (int t = 0; t < 5; t++) {
+      if (_video != null && _video!.videoWidth > 0 && _video!.videoHeight > 0) break;
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+
     for (int i = 0; i < 5; i++) {
       final f = _captureOneFrameJpegSync();
       if (f != null) frames.add(f);
       await Future.delayed(const Duration(milliseconds: 200));
     }
+
     return frames;
   }
 
