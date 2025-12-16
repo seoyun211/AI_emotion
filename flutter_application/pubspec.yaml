@@ -10,12 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   flutter_localizations:
     sdk: flutter
 
   http: ^1.2.0
   dio: ^5.7.0
+  http_parser: ^4.0.2  # ✅ Web에서 multipart content-type 지정용
+  audioplayers: ^5.2.0
 
   # 감정 분석을 위한 카메라/음성
   camera: ^0.11.3
@@ -33,11 +35,11 @@ dependencies:
   # 3D 모델
   model_viewer_plus: ^1.9.3
 
-  # 🔊 말동이 음성 재생용
-  audioplayers: ^5.2.0
-
+  # 음성 인식/합성
   speech_to_text: ^7.3.0
   flutter_tts: ^3.8.3
+
+  js: ^0.6.7
 
 dev_dependencies:
   flutter_test:

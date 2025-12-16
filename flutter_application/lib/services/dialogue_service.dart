@@ -1,135 +1,77 @@
-// lib/services/dialogue_service.dart
-
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart'; // ✅ pubspec에 http_parser 추가 필요
 import 'package:audioplayers/audioplayers.dart';
 
-import '../models/dialogue_response.dart';
-import '../models/session.dart';
+/// 웹에서는 localhost OK
+const String baseUrl = "http://localhost:8000";
 
-/// ✅ 에뮬레이터에서 PC(호스트) FastAPI로 접근
-/// - Android Emulator: 10.0.2.2
-/// - 실제 폰: PC의 로컬 IP (예: 192.168.34.40)
-const String baseUrl = "http://10.0.2.2:8000";
+/// ✅ 백엔드 router = APIRouter(prefix="/dialogue") 이라서
+/// /dialogue/web 로 호출
+const String apiPrefix = "/dialogue";
 
-/// ✅ 백엔드가 include_router(..., prefix="/api/v1") 형태라면 이 prefix를 사용
-const String apiPrefix = "/api/v1";
-
+/// ✅ TTS 플레이어 (웹에서도 재생됨)
 final AudioPlayer maldongTtsPlayer = AudioPlayer();
 
-/// 🎙 음성 + 프레임 → /dialogue/speak 호출 → TTS 재생
-Future<DialogueResponse> sendToMaldongAndPlayTts({
-  required Uint8List audioBytes,
-  required List<Uint8List> frameBytesList,
+/// ===============================
+/// ✅ Flutter Web 전용
+/// 텍스트 + 프레임(5장) → /dialogue/web
+/// ===============================
+Future<Map<String, dynamic>> sendToMaldongWeb({
+  required String text,
+  required List<Uint8List> frames,
   required int userId,
 }) async {
-  final uri = Uri.parse("$baseUrl$apiPrefix/dialogue/speak");
-
+  final uri = Uri.parse("$baseUrl$apiPrefix/web");
   final request = http.MultipartRequest("POST", uri);
 
-  // 1) audio_file
-  request.files.add(
-    http.MultipartFile.fromBytes(
-      'audio_file',
-      audioBytes,
-      filename: 'voice.m4a', // ✅ 실제로는 m4a를 보내는 경우가 많아서 이름도 맞춰줌
-    ),
-  );
+  // 1) text + user_id
+  request.fields["text"] = text;
+  request.fields["user_id"] = userId.toString();
 
   // 2) frames
-  for (int i = 0; i < frameBytesList.length; i++) {
+  for (int i = 0; i < frames.length; i++) {
     request.files.add(
       http.MultipartFile.fromBytes(
-        'frames',
-        frameBytesList[i],
-        filename: 'frame_$i.jpg',
+        "frames",
+        frames[i],
+        filename: "frame_$i.jpg",
+        contentType: MediaType("image", "jpeg"),
       ),
     );
   }
 
-  // 3) user_id (✅ Form(None)으로 받게 바꿨으니 이게 먹는다)
-  request.fields['user_id'] = userId.toString();
-
-  final streamedResponse = await request.send();
-  final response = await http.Response.fromStream(streamedResponse);
+  final streamed = await request.send();
+  final response = await http.Response.fromStream(streamed);
 
   if (response.statusCode != 200) {
     throw Exception(
-      "말동이 서버 오류: ${response.statusCode} / ${utf8.decode(response.bodyBytes)}",
+      "웹 감정분석 실패: ${response.statusCode}\n${utf8.decode(response.bodyBytes)}",
     );
   }
 
-  final Map<String, dynamic> jsonData =
-      jsonDecode(utf8.decode(response.bodyBytes));
-
-  final dialogue = DialogueResponse.fromJson(jsonData);
-
-  // 6) TTS 재생
-  await _playTtsFromBase64(dialogue.ttsAudioBase64);
-
-  return dialogue;
+  return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
 }
 
-Future<void> _playTtsFromBase64(String base64Audio) async {
-  if (base64Audio.isEmpty) return;
-
-  final bytes = base64Decode(base64Audio);
-
-  await maldongTtsPlayer.stop();
-  await maldongTtsPlayer.play(BytesSource(bytes));
-}
-
-/// -------------------------
-/// ✅ Session start / end
-/// -------------------------
-
-Future<Session> startSession({required int userId}) async {
-  final uri = Uri.parse("$baseUrl$apiPrefix/dialogue/session/start")
-      .replace(queryParameters: {'user_id': userId.toString()});
-
-  final response = await http.post(
-    uri,
-    headers: {'Content-Type': 'application/json'},
-  );
-
-  if (response.statusCode != 200) {
-    throw Exception(
-      "세션 시작 실패: ${response.statusCode} / ${utf8.decode(response.bodyBytes)}",
-    );
-  }
-
-  final Map<String, dynamic> jsonData =
-      jsonDecode(utf8.decode(response.bodyBytes));
-  return Session.fromJson(jsonData);
-}
-
-Future<Session> endSession({
-  required int sessionId,
+/// ===============================
+/// ✅ Web: 분석 요청 + TTS 재생까지
+/// (VideoCallScreen에서 이걸 호출하면 됨)
+/// ===============================
+Future<Map<String, dynamic>> sendToMaldongWebAndPlayTts({
+  required String text,
+  required List<Uint8List> frames,
   required int userId,
-  required String fullTranscript,
 }) async {
-  final uri = Uri.parse("$baseUrl$apiPrefix/dialogue/session/end").replace(
-    queryParameters: {
-      'session_id': sessionId.toString(),
-      'user_id': userId.toString(),
-      'full_transcript': fullTranscript,
-    },
-  );
+  final data = await sendToMaldongWeb(text: text, frames: frames, userId: userId);
 
-  final response = await http.post(
-    uri,
-    headers: {'Content-Type': 'application/json'},
-  );
-
-  if (response.statusCode != 200) {
-    throw Exception(
-      "세션 종료 실패: ${response.statusCode} / ${utf8.decode(response.bodyBytes)}",
-    );
+  final String b64 = (data["tts_audio_base64"] ?? "").toString();
+  if (b64.isNotEmpty) {
+    final bytes = base64Decode(b64);
+    await maldongTtsPlayer.stop();
+    await maldongTtsPlayer.play(BytesSource(bytes));
   }
 
-  final Map<String, dynamic> jsonData =
-      jsonDecode(utf8.decode(response.bodyBytes));
-  return Session.fromJson(jsonData);
+  return data;
 }

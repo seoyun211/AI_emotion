@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import List, Optional
 from io import BytesIO
 import base64
-from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
@@ -19,11 +18,15 @@ from services.tts_service import tts_synthesize_to_bytes
 router = APIRouter(prefix="/dialogue", tags=["Dialogue"])
 
 
+# =========================================================
+# ✅ 1) 모바일/에뮬 실시간: 오디오 + 프레임
+#    (네가 준 코드 그대로 유지)
+# =========================================================
 @router.post("/speak")
 async def handle_user_speech(
     audio_file: UploadFile = File(...),
     frames: List[UploadFile] = File([]),
-    user_id: Optional[int] = Form(None),   # ✅ multipart form-field로 받기
+    user_id: Optional[int] = Form(None),
 ):
     print("[/dialogue/speak] ✅ 요청 들어옴")
     print(f"  - user_id: {user_id}, frames: {len(frames)}")
@@ -66,7 +69,7 @@ async def handle_user_speech(
     # 4) 감정 분석 + DB 저장
     analysis_result = await process_emotion_analysis(
         text=user_text,
-        user_id=user_id,                 # ✅ 여기로 전달
+        user_id=user_id,
         image_frames=frame_bytes_list,
         audio_bytes=wav_bytes,
     )
@@ -97,6 +100,67 @@ async def handle_user_speech(
         content={
             "user_id": user_id,
             "user_text": user_text,
+            "emotion": emotion,
+            "confidence": confidence,
+            "risk_score": risk_score,
+            "llm_reply": llm_reply,
+            "tts_audio_base64": tts_b64,
+            "ensemble_detail": ensemble_detail,
+            "analysis_id": analysis_result.get("analysis_id"),
+            "timestamp": str(analysis_result.get("timestamp")),
+        }
+    )
+
+
+# =========================================================
+# ✅ 2) 웹(Flutter Web) 1단계: 텍스트 + 프레임(5장)만
+#    - 오디오/ STT 없음
+#    - 프레임은 5fps로 캡처해서 frames로 보내면 됨
+# =========================================================
+@router.post("/web")
+async def handle_web_input(
+    text: str = Form("..."),
+    frames: List[UploadFile] = File([]),
+    user_id: Optional[int] = Form(None),
+):
+    print("[/dialogue/web] ✅ 요청 들어옴")
+    print(f"  - user_id: {user_id}, frames: {len(frames)}, text_len: {len(text)}")
+
+    # 1) 프레임 bytes 리스트
+    frame_bytes_list: Optional[List[bytes]] = None
+    if frames:
+        frame_bytes_list = [await f.read() for f in frames]
+
+    # 2) 감정 분석 (✅ 오디오 없음)
+    analysis_result = await process_emotion_analysis(
+        text=text if text.strip() else "...",
+        user_id=user_id,
+        image_frames=frame_bytes_list,
+        audio_bytes=None,   # ✅ 웹 1단계는 오디오 없음
+    )
+
+    emotion = analysis_result["emotion"]
+    confidence = float(analysis_result["confidence"])
+    risk_score = float(analysis_result["risk_score"])
+    ensemble_detail = analysis_result.get("ensemble_detail")
+
+    # 3) LLM 답변
+    llm_reply = get_llm_response(
+        user_text=text if text.strip() else "...",
+        emotion=emotion,
+        confidence=confidence,
+        risk_score=risk_score,
+        ensemble_detail=ensemble_detail,
+    )
+
+    # 4) TTS (선택)
+    tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
+    tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8") if tts_audio_bytes else ""
+
+    return JSONResponse(
+        content={
+            "user_id": user_id,
+            "user_text": text,
             "emotion": emotion,
             "confidence": confidence,
             "risk_score": risk_score,
