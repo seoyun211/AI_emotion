@@ -5,8 +5,8 @@ import 'dart:convert';
 import 'settings_screen.dart';
 
 // 🔥 백엔드 주소 (프로젝트 전체에서 쓰는 baseUrl과 맞춰줘)
-const String baseUrl = 'http://10.0.2.2:8000';
-//const String baseUrl = 'http://localhost:8000';
+//const String baseUrl = 'http://10.0.2.2:8000';
+const String baseUrl = 'http://127.0.0.1:8000';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});

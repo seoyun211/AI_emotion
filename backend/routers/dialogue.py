@@ -1,173 +1,120 @@
-# backend/routers/dialogue.py
+# routers/dialogue.py
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+import uuid
 
-from __future__ import annotations
-from typing import List, Optional
-from io import BytesIO
-import base64
-
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse
-
-import speech_recognition as sr
-from pydub import AudioSegment
-
-from services.emotion_service import process_emotion_analysis
-from services.llm_service import get_llm_response
-from services.tts_service import tts_synthesize_to_bytes
+from database.session import get_db_connection
 
 router = APIRouter(prefix="/dialogue", tags=["Dialogue"])
 
+# -------------------------
+# 요청 스키마
+# -------------------------
+class SessionStartResponse(BaseModel):
+    session_id: int
+    start_time: str
 
-# =========================================================
-# ✅ 1) 모바일/에뮬 실시간: 오디오 + 프레임
-#    (네가 준 코드 그대로 유지)
-# =========================================================
-@router.post("/speak")
-async def handle_user_speech(
-    audio_file: UploadFile = File(...),
-    frames: List[UploadFile] = File([]),
-    user_id: Optional[int] = Form(None),
-):
-    print("[/dialogue/speak] ✅ 요청 들어옴")
-    print(f"  - user_id: {user_id}, frames: {len(frames)}")
+class SessionEndRequest(BaseModel):
+    session_id: int
+    user_id: int
+    full_transcript: Optional[str] = None
+    final_emotion: Optional[str] = None   # ✅ 없어도 되게
+    risk_score: Optional[float] = None
 
-    # 1) 오디오 bytes 읽기
+# -------------------------
+# 1) 세션 시작
+# POST /api/v1/dialogue/session/start?user_id=1
+# -------------------------
+@router.post("/session/start", response_model=SessionStartResponse)
+def start_session(user_id: int):
+    conn = get_db_connection()
     try:
-        original_bytes = await audio_file.read()
-        print(f"  - audio_file bytes: {len(original_bytes)}")
-
-        # m4a 등 -> wav 변환
-        audio_segment = AudioSegment.from_file(BytesIO(original_bytes))
-        wav_buffer = BytesIO()
-        audio_segment.export(wav_buffer, format="wav")
-        wav_bytes = wav_buffer.getvalue()
-        print(f"  - wav bytes: {len(wav_bytes)}")
+        now = datetime.now()
+        with conn.cursor() as cur:
+            sql = """
+            INSERT INTO Session (user_id, start_time, end_time, duration_seconds, full_transcript)
+            VALUES (%s, %s, NULL, NULL, NULL)
+            """
+            cur.execute(sql, (user_id, now))
+        conn.commit()
+        return SessionStartResponse(session_id=int(cur.lastrowid), start_time=now.isoformat())
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"오디오 변환 실패: {e}")
-
-    # 2) STT
-    recognizer = sr.Recognizer()
-    try:
-        with sr.AudioFile(BytesIO(wav_bytes)) as source:
-            audio_data = recognizer.record(source)
-
         try:
-            user_text = recognizer.recognize_google(audio_data, language="ko-KR")
-        except sr.UnknownValueError:
-            user_text = ""
+            conn.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"세션 시작 실패: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+# -------------------------
+# 2) 세션 종료 + ✅ 통화 1번 = analysischunk 1개 저장
+# POST /api/v1/dialogue/session/end
+# -------------------------
+@router.post("/session/end")
+def end_session(payload: SessionEndRequest):
+    conn = get_db_connection()
+    try:
+        end_time = datetime.now()
+
+        # ✅ final_emotion 없으면 기본값(422 방지)
+        final_emotion = (payload.final_emotion or "").strip() or "기쁨"
+        risk_score = float(payload.risk_score) if payload.risk_score is not None else 0.0
+        transcript = payload.full_transcript
+
+        with conn.cursor() as cur:
+            # 1) Session 업데이트
+            sql_update = """
+            UPDATE Session
+            SET end_time = %s,
+                full_transcript = %s,
+                duration_seconds = TIMESTAMPDIFF(SECOND, start_time, %s)
+            WHERE session_id = %s AND user_id = %s
+            """
+            cur.execute(
+                sql_update,
+                (end_time, transcript, end_time, payload.session_id, payload.user_id),
+            )
+
+            # 2) ✅ analysischunk에 1건만 저장
+            sql_insert = """
+            INSERT INTO analysischunk
+              (session_id, user_id, analysis_id, analysis_time, risk_score, final_result)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            cur.execute(
+                sql_insert,
+                (
+                    payload.session_id,
+                    payload.user_id,
+                    str(uuid.uuid4()),
+                    end_time,
+                    risk_score,
+                    final_emotion,
+                ),
+            )
+
+        conn.commit()
+        return {
+            "ok": True,
+            "session_id": payload.session_id,
+            "saved_emotion": final_emotion,
+            "saved_at": end_time.isoformat(),
+        }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"STT 처리 실패: {e}")
-
-    if not user_text.strip():
-        user_text = "..."
-
-    # 3) 프레임 bytes 리스트
-    frame_bytes_list: Optional[List[bytes]] = None
-    if frames:
-        frame_bytes_list = [await f.read() for f in frames]
-
-    # 4) 감정 분석 + DB 저장
-    analysis_result = await process_emotion_analysis(
-        text=user_text,
-        user_id=user_id,
-        image_frames=frame_bytes_list,
-        audio_bytes=wav_bytes,
-    )
-
-    emotion = analysis_result["emotion"]
-    confidence = float(analysis_result["confidence"])
-    risk_score = float(analysis_result["risk_score"])
-    ensemble_detail = analysis_result.get("ensemble_detail")
-
-    # 5) LLM 답변
-    llm_reply = get_llm_response(
-        user_text=user_text,
-        emotion=emotion,
-        confidence=confidence,
-        risk_score=risk_score,
-        ensemble_detail=ensemble_detail,
-    )
-
-    # 6) TTS
-    tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
-    if tts_audio_bytes is None:
-        raise HTTPException(status_code=500, detail="TTS 합성 실패")
-
-    tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8")
-
-    # 7) 응답
-    return JSONResponse(
-        content={
-            "user_id": user_id,
-            "user_text": user_text,
-            "emotion": emotion,
-            "confidence": confidence,
-            "risk_score": risk_score,
-            "llm_reply": llm_reply,
-            "tts_audio_base64": tts_b64,
-            "ensemble_detail": ensemble_detail,
-            "analysis_id": analysis_result.get("analysis_id"),
-            "timestamp": str(analysis_result.get("timestamp")),
-        }
-    )
-
-
-# =========================================================
-# ✅ 2) 웹(Flutter Web) 1단계: 텍스트 + 프레임(5장)만
-#    - 오디오/ STT 없음
-#    - 프레임은 5fps로 캡처해서 frames로 보내면 됨
-# =========================================================
-@router.post("/web")
-async def handle_web_input(
-    text: str = Form("..."),
-    frames: List[UploadFile] = File([]),
-    user_id: Optional[int] = Form(None),
-):
-    print("[/dialogue/web] ✅ 요청 들어옴")
-    print(f"  - user_id: {user_id}, frames: {len(frames)}, text_len: {len(text)}")
-
-    # 1) 프레임 bytes 리스트
-    frame_bytes_list: Optional[List[bytes]] = None
-    if frames:
-        frame_bytes_list = [await f.read() for f in frames]
-
-    # 2) 감정 분석 (✅ 오디오 없음)
-    analysis_result = await process_emotion_analysis(
-        text=text if text.strip() else "...",
-        user_id=user_id,
-        image_frames=frame_bytes_list,
-        audio_bytes=None,   # ✅ 웹 1단계는 오디오 없음
-    )
-
-    emotion = analysis_result["emotion"]
-    confidence = float(analysis_result["confidence"])
-    risk_score = float(analysis_result["risk_score"])
-    ensemble_detail = analysis_result.get("ensemble_detail")
-
-    # 3) LLM 답변
-    llm_reply = get_llm_response(
-        user_text=text if text.strip() else "...",
-        emotion=emotion,
-        confidence=confidence,
-        risk_score=risk_score,
-        ensemble_detail=ensemble_detail,
-    )
-
-    # 4) TTS (선택)
-    tts_audio_bytes = await tts_synthesize_to_bytes(llm_reply)
-    tts_b64 = base64.b64encode(tts_audio_bytes).decode("utf-8") if tts_audio_bytes else ""
-
-    return JSONResponse(
-        content={
-            "user_id": user_id,
-            "user_text": text,
-            "emotion": emotion,
-            "confidence": confidence,
-            "risk_score": risk_score,
-            "llm_reply": llm_reply,
-            "tts_audio_base64": tts_b64,
-            "ensemble_detail": ensemble_detail,
-            "analysis_id": analysis_result.get("analysis_id"),
-            "timestamp": str(analysis_result.get("timestamp")),
-        }
-    )
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"세션 종료 실패: {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass

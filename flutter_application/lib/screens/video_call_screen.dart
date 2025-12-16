@@ -9,7 +9,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'dart:ui' as ui;
+import 'dart:ui_web' as ui_web;
 import 'dart:html' as html;
 
 import 'chat_screen.dart';
@@ -37,10 +37,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   int _seconds = 0;
   Timer? _timer;
 
-  // ✅ ChatOverlay에서 넘어온 최신 텍스트
-  String _latestSpeechText = "...";
-
-  // ✅ 말끝날 때만 요청 보내기 위한 플래그
   bool _isSending = false;
   String _lastSentText = "";
 
@@ -54,13 +50,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   ];
   late String _selectedBackground;
 
-  // ✅ 웹캠
   html.VideoElement? _video;
   html.MediaStream? _stream;
   bool _isCameraOn = false;
   String? _cameraErrorMessage;
 
   late final String _viewType;
+
+  // ✅ 채팅 컨트롤러
+  final MaldongChatController _chatController = MaldongChatController();
+
+  // ✅ 세션 상태
+  int? _sessionId;
+  bool _isEnding = false;
 
   @override
   void initState() {
@@ -76,6 +78,21 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     _viewType = 'webcam-view-${DateTime.now().millisecondsSinceEpoch}';
     _initWebCamera();
+
+    _startSession();
+  }
+
+  Future<void> _startSession() async {
+    try {
+      final sid = await startCallSession(userId: widget.userId);
+      if (!mounted) return;
+      setState(() => _sessionId = sid);
+      // ignore: avoid_print
+      print("✅ session/start 성공: session_id=$_sessionId");
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ session/start 실패: $e");
+    }
   }
 
   @override
@@ -85,9 +102,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     super.dispose();
   }
 
-  // =========================
-  // ⏱ 타이머
-  // =========================
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
@@ -101,33 +115,40 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return '${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
-  // =========================
-  // 🎥 웹캠 초기화/종료
-  // =========================
   Future<void> _initWebCamera() async {
     try {
+      _stopWebCamera();
+
       final v = html.VideoElement()
         ..autoplay = true
         ..muted = true
-        ..style.objectFit = 'cover';
+        ..style.objectFit = 'cover'
+        ..style.width = '100%'
+        ..style.height = '100%';
 
-      // ✅ playsInline은 attribute로
       v.setAttribute('playsinline', 'true');
       v.setAttribute('webkit-playsinline', 'true');
 
       final s = await html.window.navigator.mediaDevices!.getUserMedia({
-        'video': {'facingMode': 'user'},
+        'video': {
+          'facingMode': {'ideal': 'user'},
+          'width': {'ideal': 640},
+          'height': {'ideal': 480},
+        },
         'audio': false,
       });
 
       v.srcObject = s;
+
+      await v.onLoadedMetadata.first;
       await v.play();
 
-      ui.platformViewRegistry.registerViewFactory(
+      ui_web.platformViewRegistry.registerViewFactory(
         _viewType,
         (int viewId) => v,
       );
 
+      if (!mounted) return;
       setState(() {
         _video = v;
         _stream = s;
@@ -135,10 +156,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _cameraErrorMessage = null;
       });
     } catch (e) {
+      final msg = (e is html.DomException) ? "${e.name}: ${e.message}" : e.toString();
+
+      if (!mounted) return;
       setState(() {
-        _cameraErrorMessage = "웹캠 권한/접근 실패: $e";
+        _cameraErrorMessage = "웹캠 실패: $msg";
         _isCameraOn = false;
       });
+
+      // ignore: avoid_print
+      print("웹캠 실패 상세: $msg");
     }
   }
 
@@ -153,6 +180,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   void _toggleCamera() {
     if (!kIsWeb) return;
+    if (_isEnding) return;
 
     if (_isCameraOn) {
       _stopWebCamera();
@@ -162,9 +190,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     }
   }
 
-  // =========================
-  // 🖼 프레임 캡처 (toDataUrl 방식: 빨간줄/타입문제 회피)
-  // =========================
   Uint8List? _captureOneFrameJpegSync() {
     final v = _video;
     if (v == null) return null;
@@ -179,9 +204,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Uint8List.fromList(base64Decode(base64Str));
   }
 
-  /// ✅ 1초 동안 5프레임(200ms 간격) 캡처
   Future<List<Uint8List>> _captureFrames5fps() async {
     final frames = <Uint8List>[];
+
+    for (int t = 0; t < 5; t++) {
+      if (_video != null && _video!.videoWidth > 0 && _video!.videoHeight > 0) break;
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+
     for (int i = 0; i < 5; i++) {
       final f = _captureOneFrameJpegSync();
       if (f != null) frames.add(f);
@@ -190,20 +220,20 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return frames;
   }
 
-  // =========================
-  // ✅ 말끝날 때(최종 텍스트 들어올 때)만 감정분석 요청
-  // =========================
+  /// ✅ 말끝날 때만 감정분석 요청 + 말동이 "생각중" 표시
   Future<void> _sendEmotionOnceWithText(String text) async {
     final trimmed = text.trim().isEmpty ? "..." : text.trim();
 
-    // 카메라 없으면 전송 안 함
     if (!kIsWeb || !_isCameraOn) return;
-
-    // 같은 문장 중복 전송 방지
+    if (_isEnding) return;
     if (trimmed == _lastSentText) return;
-
     if (_isSending) return;
+
     _isSending = true;
+
+    // ✅ “대답중” 말풍선 ON + 최소 표시시간 확보(깜빡임 방지)
+    final startAt = DateTime.now();
+    _chatController.setTyping(true);
 
     try {
       final frames = await _captureFrames5fps();
@@ -211,23 +241,80 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
       _lastSentText = trimmed;
 
-      // ✅ 텍스트 + 프레임(5장) → /dialogue/web
-      await sendToMaldongWebAndPlayTts(
+      final data = await sendToMaldongWebAndPlayTts(
         text: trimmed,
         frames: frames,
         userId: widget.userId,
       );
+
+      // ✅ 여기다 추가하면 됨 (data 받은 직후)
+      print("🖼 p_img=${data['p_img']}");
+      print("📝 p_text=${data['p_text']}");
+      print("🎯 p_final=${data['p_final']}");
+      print("✅ final_emotion=${data['final_emotion']}, conf=${data['confidence']}, risk=${data['risk_score']}");
+
+      final reply = (data["llm_reply"] ?? "").toString().trim();
+      if (reply.isNotEmpty) {
+        _chatController.addBotMessage(reply);
+      } else {
+        // ignore: avoid_print
+        print("⚠️ llm_reply 비어있음. keys=${data.keys.toList()}");
+        _chatController.addBotMessage("음… 다시 한번 말씀해 주실래요?");
+      }
+
+      // ignore: avoid_print
+      print("📌 응답키들: ${data.keys.toList()}");
     } catch (e) {
       // ignore: avoid_print
       print("웹 감정분석 전송 오류: $e");
+      _chatController.addBotMessage("죄송해요, 지금은 연결이 불안정해요. 다시 한번 말해주실래요?");
     } finally {
+      // ✅ 최소 400ms는 “생각중” 보이게
+      final elapsed = DateTime.now().difference(startAt);
+      final remain = 400 - elapsed.inMilliseconds;
+      if (remain > 0) await Future.delayed(Duration(milliseconds: remain));
+
+      _chatController.setTyping(false);
       _isSending = false;
     }
   }
 
-  // =========================
-  // 🖼 UI
-  // =========================
+  Future<void> _endSessionAndExit() async {
+    if (_isEnding) return;
+    setState(() => _isEnding = true);
+
+    try {
+      final sid = _sessionId;
+      if (sid == null) {
+        // ignore: avoid_print
+        print("❌ session_id가 null이라 저장 불가. session/start 확인 필요");
+      } else {
+        await endCallSession(sessionId: sid, userId: widget.userId);
+        // ignore: avoid_print
+        print("✅ session/end 저장 성공 (통화 1번 = 감정 1개)");
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print("❌ session/end 실패: $e");
+    } finally {
+      _timer?.cancel();
+      _stopWebCamera();
+
+      if (!mounted) return;
+
+      widget.onEndCall();
+
+      final nav = Navigator.of(context);
+      if (nav.canPop()) {
+        nav.pop();
+      } else {
+        nav.maybePop();
+      }
+
+      if (mounted) setState(() => _isEnding = false);
+    }
+  }
+
   Widget _buildTimerBox() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -237,11 +324,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       ),
       child: Text(
         _formatTime(_seconds),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -255,10 +338,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(
-              _cameraErrorMessage!,
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
+            child: Text(_cameraErrorMessage!, style: const TextStyle(color: Colors.white, fontSize: 12)),
           ),
         ),
       );
@@ -269,9 +349,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         width: 120,
         height: 160,
         color: Colors.black87,
-        child: const Center(
-          child: Icon(Icons.videocam_off, color: Colors.white, size: 40),
-        ),
+        child: const Center(child: Icon(Icons.videocam_off, color: Colors.white, size: 40)),
       );
     }
 
@@ -289,6 +367,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   Widget _circleButton(IconData icon, VoidCallback onTap) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         width: 70,
@@ -306,28 +385,35 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _circleButton(
-          _isCameraOn ? Icons.videocam_off : Icons.videocam,
-          _toggleCamera,
-        ),
+        _circleButton(_isCameraOn ? Icons.videocam_off : Icons.videocam, _toggleCamera),
         const SizedBox(width: 20),
 
         GestureDetector(
-          onTap: () async {
-            _stopWebCamera();
-            widget.onEndCall();
-          },
-          child: Container(
-            width: 85,
-            height: 85,
-            decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-            child: const Center(
-              child: Icon(Icons.call_end, color: Colors.white, size: 38),
+          behavior: HitTestBehavior.opaque,
+          onTap: _isEnding ? null : _endSessionAndExit,
+          child: AbsorbPointer(
+            absorbing: _isEnding,
+            child: Opacity(
+              opacity: _isEnding ? 0.6 : 1.0,
+              child: Container(
+                width: 85,
+                height: 85,
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                child: Center(
+                  child: _isEnding
+                      ? const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                        )
+                      : const Icon(Icons.call_end, color: Colors.white, size: 38),
+                ),
+              ),
             ),
           ),
         ),
-
         const SizedBox(width: 20),
+
         _circleButton(Icons.cameraswitch, () {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("웹 카메라 전환은 다음 단계에서 추가할게요.")),
@@ -347,20 +433,19 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             Expanded(
               child: Stack(
                 children: [
+                  Positioned.fill(child: Image.asset(_selectedBackground, fit: BoxFit.cover)),
+
                   Positioned.fill(
-                    child: Image.asset(_selectedBackground, fit: BoxFit.cover),
-                  ),
-                  Positioned.fill(
-                    child: Transform.scale(scale: 0.9, child: widget.avatar),
+                    child: IgnorePointer(
+                      ignoring: true,
+                      child: Transform.scale(scale: 0.9, child: widget.avatar),
+                    ),
                   ),
 
-                  // ✅ 여기: 최종 텍스트 들어오면 즉시 감정분석 1회 전송
                   MaldongChatOverlay(
+                    controller: _chatController,
                     onFinalText: (txt) {
                       final t = txt.trim().isEmpty ? "..." : txt.trim();
-                      setState(() => _latestSpeechText = t);
-
-                      // ✅ 말끝날 때만: 텍스트+5프레임 전송
                       _sendEmotionOnceWithText(t);
                     },
                   ),

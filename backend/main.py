@@ -14,7 +14,7 @@ from routers.guardian import router as guardian_router
 from routers.calls import router as calls_router  
 from routers.analyses import router as analyses_router 
 from routers.web_analyze import router as web_analyze_router
-
+from routers.emotions import router as emotions_router
 
 # -------------------------
 # 🚀 FastAPI 앱 및 미들웨어 설정
@@ -32,14 +32,15 @@ app.add_middleware(
 
 # ✅ 라우터 포함
 #  - /api/v1/dialogue/speak : 영상통화 + 감정 + LLM + TTS
-app.include_router(dialogue_router, prefix="/api/v1") 
-app.include_router(alerts_router) 
-app.include_router(users_router)    
-app.include_router(auth_router)     
-app.include_router(guardian_router)
-app.include_router(calls_router, prefix="/api/v1")    
+app.include_router(dialogue_router, prefix="/api/v1")  # dialogue는 router 내부 prefix="/dialogue"라서 OK
+app.include_router(calls_router, prefix="/api/v1") 
+app.include_router(alerts_router)    # calls도 router 내부 prefix="/calls"라면 OK
+app.include_router(analyses_router)  # ✅ analyses는 이미 /api/v1/analyses
+app.include_router(users_router)     # users_router가 내부에 /api/v1/users면 prefix 빼
+app.include_router(auth_router)      # auth_router가 내부에 /api/v1/auth면 prefix 빼
+app.include_router(guardian_router)  # guardian_router가 내부에 /api/v1/guardian면 prefix 빼
+app.include_router(web_analyze_router, prefix="/api/v1")  # 얘가 router에 prefix가 없으면 여기서 붙여
 app.include_router(analyses_router, prefix="/api/v1")
-app.include_router(web_analyze_router, prefix="/api/v1")
 
 
 # from routers.ensemble import router as ensemble_router

@@ -319,115 +319,85 @@ class AlertCRUD:
         return alerts_data
     
 # =========================================================================
-# 6. 통화 기록 관리 (SessionCRUD)
+# 6. 통화 기록 관리 (SessionCRUD)  ✅ 최종본
 # =========================================================================
+from typing import Dict
+from database.session import get_db_connection
 
 class SessionCRUD:
     """통화 기록(Session) 관리 클래스"""
 
     @staticmethod
-    def create_session(user_id: int, start_time: str, end_time: str | None, duration_seconds: int | None, full_transcript: str | None) -> int | None:
-        """
-        새로운 통화 기록(Session)을 데이터베이스에 저장합니다.
-        """
+    def create_session(
+        user_id: int,
+        start_time: str,
+        end_time: str | None,
+        duration_seconds: int | None,
+        full_transcript: str | None,
+    ) -> int | None:
         connection = None
         session_id = None
 
         try:
             connection = get_db_connection()
-            
-            # SQL 쿼리: full_transcript 필드에 값을 저장하도록 수정
+            if not connection:
+                raise Exception("DB 연결 실패")
+
             sql = """
-                INSERT INTO Session 
-                    (user_id, start_time, end_time, duration_seconds, full_transcript) 
-                VALUES 
-                    (%s, %s, %s, %s, %s)
+                INSERT INTO Session (user_id, start_time, end_time, duration_seconds, full_transcript)
+                VALUES (%s, %s, %s, %s, %s)
             """
-            
-            # SQL에 전달할 데이터 (순서가 SQL 필드와 일치해야 함)
-            data = (
-                user_id, 
-                start_time, 
-                end_time, 
-                duration_seconds, 
-                full_transcript  # STT 텍스트 데이터
-            )
+            data = (user_id, start_time, end_time, duration_seconds, full_transcript)
 
             with connection.cursor() as cursor:
                 cursor.execute(sql, data)
-                
-                # 새로 생성된 ID를 가져옵니다.
                 session_id = cursor.lastrowid
-                
-                connection.commit()
-                
-                print(f"✅ Session 생성 성공. Session ID: {session_id}")
-                return session_id
+            connection.commit()
+
+            print(f"✅ Session 생성 성공. Session ID: {session_id}")
+            return session_id
 
         except Exception as e:
             if connection:
-                connection.rollback() # 오류 발생 시 롤백
-            print(f"❌ Session 생성 실패 (DB Error in crud.py): {e}")
+                connection.rollback()
+            print(f"❌ Session 생성 실패: {e}")
             return None
-            
-        finally:
-            # Note: DB 연결 관리는 get_db_connection()에서 처리한다고 가정하고 여기서는 pass
-            pass
-            
 
     @staticmethod
-    def update_session(session_id: int, end_time: str, full_transcript: str):
-        """특정 session_id의 통화 기록을 종료 시간과 최종 녹취록으로 업데이트합니다."""
+    def update_session(session_id: int, end_time: str, full_transcript: str) -> bool:
         connection = get_db_connection()
         if not connection:
-            return None
-        
-        # duration_seconds는 MySQL의 TIMESTAMPDIFF(SECOND, start_time, end_time)을 사용하여 계산
+            return False
+
         sql = """
             UPDATE Session
-            SET 
+            SET
                 end_time = %s,
                 full_transcript = %s,
-                duration_seconds = TIMESTAMPDIFF(SECOND, start_time, %s) 
-            WHERE 
-                session_id = %s
+                duration_seconds = TIMESTAMPDIFF(SECOND, start_time, %s)
+            WHERE session_id = %s
         """
-        
-        params = (
-            end_time,
-            full_transcript,
-            end_time, # TIMESTAMPDIFF의 두 번째 인수로 사용
-            session_id
-        )
+        params = (end_time, full_transcript, end_time, session_id)
 
         try:
             with connection.cursor() as cursor:
                 cursor.execute(sql, params)
+                updated = cursor.rowcount > 0
             connection.commit()
-            return True # 성공 여부만 반환하도록 단순화
+            return updated
         except Exception as e:
             connection.rollback()
             print(f"❌ Session 업데이트 실패: {e}")
-            return None
+            return False
 
     @staticmethod
     def get_session_by_id(session_id: int) -> Dict | None:
-        """
-        특정 session_id에 해당하는 통화 기록(Session)을 조회합니다.
-        """
         connection = get_db_connection()
         if not connection:
-            # ... (오류 처리)
             return None
 
         sql = """
-            SELECT 
-                session_id, 
-                user_id, 
-                start_time, 
-                end_time, 
-                duration_seconds, 
-                full_transcript
+            SELECT session_id, user_id, start_time, end_time, duration_seconds, full_transcript
             FROM Session
             WHERE session_id = %s
         """
@@ -437,56 +407,17 @@ class SessionCRUD:
                 cursor.execute(sql, (session_id,))
                 return cursor.fetchone()
         except Exception as e:
-            # ... (오류 처리)
+            print(f"❌ Session 조회 실패: {e}")
             return None
-
-    @staticmethod
-    def get_session_by_id(session_id: int) -> Dict | None:
-        """
-        특정 session_id에 해당하는 통화 기록(Session)을 조회합니다.
-        """
-        connection = get_db_connection()
-        if not connection:
-            # ... (오류 처리)
-            return None
-
-        sql = """
-            SELECT 
-                session_id, 
-                user_id, 
-                start_time, 
-                end_time, 
-                duration_seconds, 
-                full_transcript
-            FROM Session
-            WHERE session_id = %s
-        """
-
-        try:
-            with connection.cursor() as cursor:
-                cursor.execute(sql, (session_id,))
-                return cursor.fetchone()
-        except Exception as e:
-            # ... (오류 처리)
-            return None        
 
     @staticmethod
     def get_sessions_by_user_id(user_id: int) -> list[Dict]:
-        """
-        특정 피보호자(user_id)의 통화 기록 전체를 조회합니다. (피보호자 본인 앱용)
-        """
         connection = get_db_connection()
         if not connection:
             return []
 
         sql = """
-            SELECT 
-                session_id, 
-                user_id, 
-                start_time, 
-                end_time, 
-                duration_seconds, 
-                full_transcript
+            SELECT session_id, user_id, start_time, end_time, duration_seconds, full_transcript
             FROM Session
             WHERE user_id = %s
             ORDER BY start_time DESC
@@ -496,7 +427,6 @@ class SessionCRUD:
             with connection.cursor() as cursor:
                 cursor.execute(sql, (user_id,))
                 return cursor.fetchall()
-
         except Exception as e:
-            print(f"❌ UserID로 통화 기록 조회 중 DB 쿼리 오류: {e}")
+            print(f"❌ UserID로 통화 기록 조회 실패: {e}")
             return []

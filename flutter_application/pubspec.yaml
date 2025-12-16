@@ -17,7 +17,7 @@ dependencies:
   http: ^1.2.0
   dio: ^5.7.0
   http_parser: ^4.0.2  # ✅ Web에서 multipart content-type 지정용
-  audioplayers: ^5.2.0
+  audioplayers: 6.5.1
 
   # 감정 분석을 위한 카메라/음성
   camera: ^0.11.3

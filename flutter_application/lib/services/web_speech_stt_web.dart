@@ -1,14 +1,13 @@
 // lib/services/web_speech_stt_web.dart
 // ignore_for_file: avoid_web_libraries_in_flutter
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, VoidCallback;
 import 'dart:html' as html;
-import 'dart:js_util' as jsu;
-import 'package:js/js.dart';
-
+import 'dart:js' as js;              // ✅ allowInterop는 여기!
+import 'dart:js_util' as jsu;        // ✅ 웹에서만 존재
 typedef OnText = void Function(String text, bool isFinal);
 
-class WebSpeechSttWeb {
+class WebSpeechStt {
   bool _isAvailable = true;
   bool _isListening = false;
   dynamic _rec;
@@ -19,10 +18,6 @@ class WebSpeechSttWeb {
   VoidCallback? onStart;
   VoidCallback? onEnd;
   void Function(String error)? onError;
-
-  /// 매 결과마다 호출됨
-  /// - isFinal==false: 중간(interim)
-  /// - isFinal==true : 확정(final)
   OnText? onText;
 
   Future<void> init({String lang = "ko-KR"}) async {
@@ -33,7 +28,6 @@ class WebSpeechSttWeb {
 
     final win = jsu.getProperty(html.window, 'window');
 
-    // Chrome/Edge: SpeechRecognition, Safari: webkitSpeechRecognition
     dynamic ctor;
     if (jsu.hasProperty(win, 'SpeechRecognition')) {
       ctor = jsu.getProperty(win, 'SpeechRecognition');
@@ -50,37 +44,31 @@ class WebSpeechSttWeb {
     jsu.setProperty(_rec, 'continuous', true);
     jsu.setProperty(_rec, 'interimResults', true);
 
-    // 이벤트 핸들러
-    jsu.setProperty(_rec, 'onstart', allowInterop((_) {
+    jsu.setProperty(_rec, 'onstart', js.allowInterop((_) {
       _isListening = true;
       onStart?.call();
     }));
 
-    jsu.setProperty(_rec, 'onend', allowInterop((_) {
+    jsu.setProperty(_rec, 'onend', js.allowInterop((_) {
       _isListening = false;
       onEnd?.call();
     }));
 
-    jsu.setProperty(_rec, 'onerror', allowInterop((e) {
+    jsu.setProperty(_rec, 'onerror', js.allowInterop((e) {
       final msg = (jsu.getProperty(e, 'error')?.toString() ?? 'unknown');
       _isListening = false;
       onError?.call(msg);
     }));
 
-    // ✅ 여기 핵심: 타입을 SpeechRecognitionEvent 같은 걸로 잡지 말고 dynamic으로 받기
-    jsu.setProperty(_rec, 'onresult', allowInterop((dynamic e) {
+    jsu.setProperty(_rec, 'onresult', js.allowInterop((dynamic e) {
       try {
         final results = jsu.getProperty(e, 'results');
         final len = jsu.getProperty(results, 'length') as int;
         if (len <= 0) return;
 
-        // 마지막 결과를 읽는다
-        final lastIndex = len - 1;
-        final last = jsu.getProperty(results, lastIndex);
-
+        final last = jsu.getProperty(results, len - 1);
         final isFinal = (jsu.getProperty(last, 'isFinal') as bool?) ?? false;
 
-        // last[0].transcript
         final alt0 = jsu.getProperty(last, 0);
         final transcript =
             (jsu.getProperty(alt0, 'transcript')?.toString() ?? '').trim();
@@ -94,10 +82,7 @@ class WebSpeechSttWeb {
   }
 
   void start() {
-    if (!kIsWeb) return;
-    if (!_isAvailable || _rec == null) return;
-    if (_isListening) return;
-
+    if (!_isAvailable || _rec == null || _isListening) return;
     try {
       jsu.callMethod(_rec, 'start', []);
     } catch (e) {
@@ -106,9 +91,7 @@ class WebSpeechSttWeb {
   }
 
   void stop() {
-    if (!kIsWeb) return;
     if (_rec == null) return;
-
     try {
       jsu.callMethod(_rec, 'stop', []);
     } catch (_) {}

@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
-import '../services/web_speech_stt_web.dart';
+import '../services/web_speech_stt.dart';
 
 class ChatMessage {
   final String text;
@@ -13,12 +11,40 @@ class ChatMessage {
   ChatMessage({required this.text, required this.isUser});
 }
 
+// ✅ 외부(VideoCallScreen)에서 말동이 메시지/타이핑 상태를 제어할 컨트롤러
+class MaldongChatController {
+  void Function(String text)? _addBot;
+  void Function(bool on)? _setTyping;
+
+  void _bind(void Function(String) addBotFn, void Function(bool) typingFn) {
+    _addBot = addBotFn;
+    _setTyping = typingFn;
+  }
+
+  void _unbind() {
+    _addBot = null;
+    _setTyping = null;
+  }
+
+  void addBotMessage(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    _addBot?.call(t);
+  }
+
+  void setTyping(bool on) {
+    _setTyping?.call(on);
+  }
+}
+
 class MaldongChatOverlay extends StatefulWidget {
   final ValueChanged<String>? onFinalText;
+  final MaldongChatController? controller;
 
   const MaldongChatOverlay({
     super.key,
     this.onFinalText,
+    this.controller,
   });
 
   @override
@@ -27,29 +53,39 @@ class MaldongChatOverlay extends StatefulWidget {
 
 class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   final List<ChatMessage> _messages = [];
-  final String baseUrl = "http://localhost:8000";
+
+  // ✅ 자동 스크롤
+  final ScrollController _scrollCtrl = ScrollController();
 
   bool _isProcessing = false;
 
-  // ✅ 웹 STT
   final WebSpeechStt _webStt = WebSpeechStt();
   bool _sttReady = false;
   bool _isListening = false;
 
-  String _liveSpeech = ""; // 인식 중(중간/최종) 텍스트
+  String _liveSpeech = "";
   Timer? _silenceTimer;
-
-  final int _userId = 1; // ✅ 로그인 값으로 교체
 
   @override
   void initState() {
     super.initState();
     _sayWelcomeMessage();
     _initWebStt();
+
+    // ✅ 부모에서 bot message/typing 제어 가능하게 bind
+    widget.controller?._bind(
+      (text) => _addMessage(text, false),
+      (on) {
+        if (!mounted) return;
+        setState(() => _isProcessing = on);
+      },
+    );
   }
 
   @override
   void dispose() {
+    widget.controller?._unbind();
+    _scrollCtrl.dispose();
     _silenceTimer?.cancel();
     _webStt.dispose();
     super.dispose();
@@ -65,46 +101,59 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
 
     await _webStt.init(lang: "ko-KR");
     if (!_webStt.isAvailable) {
-      setState(() {
-        _sttReady = false;
-      });
+      if (!mounted) return;
+      setState(() => _sttReady = false);
       return;
     }
 
-    _webStt.onStart = () => setState(() => _isListening = true);
-    _webStt.onEnd = () => setState(() => _isListening = false);
-
-    _webStt.onError = (err) {
-      setState(() => _isListening = false);
-      // 너무 시끄러우면 계속 떠서 스낵바는 최소화
-      // ignore: avoid_print
-      print("Web STT error: $err");
+    _webStt.onStart = () {
+      if (!mounted) return;
+      setState(() => _isListening = true);
     };
 
-    _webStt.onResult = (text, isFinal) {
+    _webStt.onEnd = () {
+      if (!mounted) return;
+      setState(() => _isListening = false);
+    };
+
+    // ✅ no-speech 등 에러 시: 타이핑/상태 강제 해제
+    _webStt.onError = (err) {
       if (!mounted) return;
 
-      setState(() => _liveSpeech = text);
+      _silenceTimer?.cancel();
+      setState(() {
+        _isListening = false;
+        _isProcessing = false;
+        _liveSpeech = "";
+      });
 
-      // 말하는 중이면 타이머 리셋
-      _resetSilenceTimer();
+      // ignore: avoid_print
+      print("Web STT error: $err");
 
-      // final 문장이면 즉시 전송 + 콜백
-      if (isFinal) {
-        _commitFinalSpeech(text);
+      if (err.toString().contains("no-speech")) {
+        _addMessage("말이 잘 안 들렸어요. 마이크를 확인하고 조금 크게 말씀해 주세요!", false);
+      } else {
+        _addMessage("마이크 인식에 문제가 있어요. 브라우저 마이크 권한을 확인해 주세요!", false);
       }
     };
 
-    setState(() {
-      _sttReady = true;
-    });
+    _webStt.onText = (text, isFinal) {
+      if (!mounted) return;
+
+      setState(() => _liveSpeech = text);
+      _resetSilenceTimer();
+
+      if (isFinal) _commitFinalSpeech(text);
+    };
+
+    if (!mounted) return;
+    setState(() => _sttReady = true);
   }
 
   void _resetSilenceTimer() {
     _silenceTimer?.cancel();
     _silenceTimer = Timer(const Duration(milliseconds: 900), () {
-      // 0.9초 무음이면 현재 문장을 확정 처리 (UX 좋게)
-      if (_liveSpeech.trim().isNotEmpty && !_isProcessing) {
+      if (_liveSpeech.trim().isNotEmpty) {
         _commitFinalSpeech(_liveSpeech);
       }
     });
@@ -113,62 +162,44 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
   Future<void> _commitFinalSpeech(String finalText) async {
     final trimmed = finalText.trim();
     if (trimmed.isEmpty) return;
-    if (_isProcessing) return;
 
     _silenceTimer?.cancel();
 
-    setState(() {
-      _isProcessing = true;
-      _liveSpeech = ""; // 확정 후 비움
-    });
-
-    // ✅ 채팅창에 유저 메시지로 추가
+    // ✅ 사용자 말풍선 즉시 표시
     _addMessage(trimmed, true);
 
-    // ✅ VideoCallScreen에 최종 텍스트 전달 (감정분석 루프가 사용)
+    // ✅ 감정분석/LLM 호출은 VideoCallScreen에서 처리
     widget.onFinalText?.call(trimmed);
 
-    try {
-      // ✅ 웹 엔드포인트: /api/v1/dialogue/web
-      final uri = Uri.parse("$baseUrl/api/v1/dialogue/web");
-      final req = http.MultipartRequest("POST", uri);
-      req.fields["user_id"] = _userId.toString();
-      req.fields["text"] = trimmed;
-
-      final streamed = await req.send();
-      final res = await http.Response.fromStream(streamed);
-
-      if (res.statusCode != 200) {
-        _addMessage("서버 응답 오류가 발생했어요. (${res.statusCode})", false);
-        return;
-      }
-
-      final data =
-          jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final reply = (data["llm_reply"] ?? "…").toString();
-      _addMessage(reply, false);
-    } catch (e) {
-      _addMessage("잠시 연결이 불안정해요. 마이크/네트워크를 확인해 주세요!", false);
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
+    // ✅ Overlay는 서버 기다리지 않음 (타이핑은 부모가 setTyping으로 제어)
+    if (mounted) {
+      setState(() {
+        _liveSpeech = "";
+      });
     }
   }
 
   void _toggleListening() {
     if (!kIsWeb || !_sttReady) return;
-
     if (_isListening) {
       _webStt.stop();
     } else {
-      // 브라우저 정책상 “사용자 클릭 이벤트”에서 start 해야 안전
       _webStt.start();
     }
   }
 
   void _addMessage(String text, bool isUser) {
     if (!mounted) return;
-    setState(() {
-      _messages.add(ChatMessage(text: text, isUser: isUser));
+    setState(() => _messages.add(ChatMessage(text: text, isUser: isUser)));
+
+    // ✅ reverse=true라 minScrollExtent로 이동
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients) return;
+      _scrollCtrl.animateTo(
+        _scrollCtrl.position.minScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -189,6 +220,7 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
                 borderRadius: BorderRadius.circular(15),
               ),
               child: ListView.builder(
+                controller: _scrollCtrl,
                 padding: const EdgeInsets.all(8),
                 reverse: true,
                 itemCount: _messages.length + (_isProcessing ? 1 : 0),
@@ -202,9 +234,7 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // ✅ 지금 말하고 있는 내용 표시(노란 말풍선)
-          if (_liveSpeech.trim().isNotEmpty && !_isProcessing)
+          if (_liveSpeech.trim().isNotEmpty)
             Container(
               margin: const EdgeInsets.only(bottom: 6),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -214,14 +244,9 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
               ),
               child: Text(
                 _liveSpeech,
-                style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Colors.black, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
-
-          // ✅ 상태 바 + 마이크 버튼(웹)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -243,14 +268,10 @@ class _MaldongChatOverlayState extends State<MaldongChatOverlay> {
                 Text(
                   _isProcessing
                       ? "말동이가 생각 중"
-                      : (_sttReady
-                          ? (_isListening ? "듣는 중" : "마이크 눌러서 말하기")
-                          : "웹 STT 사용 불가"),
+                      : (_sttReady ? (_isListening ? "듣는 중" : "마이크 눌러서 말하기") : "웹 STT 사용 불가"),
                   style: TextStyle(
                     fontSize: 11,
-                    color: _isListening && !_isProcessing
-                        ? Colors.greenAccent
-                        : Colors.white,
+                    color: _isListening && !_isProcessing ? Colors.greenAccent : Colors.white,
                   ),
                 ),
               ],
@@ -268,17 +289,14 @@ class TypingBubble extends StatefulWidget {
   State<TypingBubble> createState() => _TypingBubbleState();
 }
 
-class _TypingBubbleState extends State<TypingBubble>
-    with SingleTickerProviderStateMixin {
+class _TypingBubbleState extends State<TypingBubble> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<int> _dotCount;
 
   @override
   void initState() {
     super.initState();
-    _controller =
-        AnimationController(duration: const Duration(seconds: 1), vsync: this)
-          ..repeat();
+    _controller = AnimationController(duration: const Duration(seconds: 1), vsync: this)..repeat();
     _dotCount = IntTween(begin: 0, end: 3).animate(_controller);
   }
 
@@ -304,11 +322,7 @@ class _TypingBubbleState extends State<TypingBubble>
           builder: (context, child) {
             return Text(
               "말동이가 생각 중${'.' * (_dotCount.value + 1)}",
-              style: const TextStyle(
-                color: Colors.black87,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.bold),
             );
           },
         ),
@@ -329,13 +343,10 @@ class ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: msg.isUser
-              ? Colors.yellow.withOpacity(0.9)
-              : Colors.white.withOpacity(0.9),
+          color: msg.isUser ? Colors.yellow.withOpacity(0.9) : Colors.white.withOpacity(0.9),
           borderRadius: BorderRadius.circular(15),
         ),
-        child: Text(msg.text,
-            style: const TextStyle(color: Colors.black87, fontSize: 13)),
+        child: Text(msg.text, style: const TextStyle(color: Colors.black87, fontSize: 13)),
       ),
     );
   }
